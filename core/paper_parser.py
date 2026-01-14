@@ -9,6 +9,22 @@ import re
 import fitz  # PyMuPDF
 
 
+def _normalize_text(text: str) -> str:
+    """Normalize text for consistent regex matching.
+
+    Args:
+        text: Raw text to normalize.
+
+    Returns:
+        Normalized text with standardized whitespace and dashes.
+    """
+    # Replace en-dash, em-dash, and Unicode minus with hyphen
+    text = text.replace("–", "-").replace("—", "-").replace("−", "-")
+    # Standardize whitespace (collapse multiple spaces, normalize newlines)
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
 def extract_text_from_pdf(file_bytes: bytes) -> list[tuple[int, str]]:
     """Extract text content from a PDF file by page.
 
@@ -40,33 +56,57 @@ def find_odds_ratios(text: str, page: int = 1) -> list[dict]:
     """
     results = []
 
-    # Pattern: OR = 2.5 or OR: 2.5 or odds ratio, 2.5
-    # With optional CI: OR = 2.5 (95% CI: 1.2-3.8) or OR = 2.5 (1.2, 3.8)
-    # Note: Patterns require explicit delimiters to avoid matching page numbers
+    # Normalize text for consistent matching
+    normalized = _normalize_text(text)
+
+    # Enhanced patterns to capture OR + CI together
+    # Number pattern: \d+(?:\.\d+)? matches "2" or "2.5" but not "2."
+    # Patterns with CI come first (more specific)
     patterns = [
-        # OR = 2.5 (95% CI: 1.2-3.8) or OR: 2.5 (1.2-3.8)
-        r"(?:OR|odds ratio)[,:\s=]+(\d+\.?\d*)\s*\(?\s*(?:95%?\s*CI)?[:\s]*(\d+\.?\d*)\s*[-–,]\s*(\d+\.?\d*)\s*\)?",
-        # OR = 2.5 or OR: 2.5 or OR, 2.5 (requires = or : or comma, excludes percentages)
-        r"(?:OR|odds ratio)\s*[=:,]\s*(\d+\.?\d*)(?!\s*%)",
-        # OR 2.5 (95% CI - requires CI to follow to avoid false positives
-        r"(?:OR|odds ratio)\s+(\d+\.?\d*)\s*\(\s*95%?\s*CI",
-        # aOR = 2.5 or adjusted odds ratio, 2.5
-        r"(?:aOR|adjusted odds ratio)[,:\s=]+(\d+\.?\d*)\s*\(?\s*(?:95%?\s*CI)?[:\s]*(\d+\.?\d*)\s*[-–,]\s*(\d+\.?\d*)\s*\)?",
-        # adjusted odds ratio, 2.5 (standalone with comma)
-        r"adjusted odds ratio\s*,\s*(\d+\.?\d*)(?!\s*%)",
+        # OR 2.2 (95% confidence interval, 1.4 to 3.4)
+        r"(?:or|odds\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*\(\s*(?:(\d+)%?\s*)?confidence\s+interval[,:\s]+(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*\)",
+        # OR 2.5 (95% CI: 1.2-3.8) or OR 2.5 (95% CI 1.2-3.8)
+        r"(?:or|odds\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*\(\s*(?:(\d+)%?\s*)?ci[:\s]*(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*\)",
+        # adjusted odds ratio, 2.5; 95% CI 1.6-3.9
+        r"(?:aor|adjusted\s+odds\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*[;,]?\s*(?:(\d+)%?\s*)?ci[:\s]*(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)",
+        # OR 2.5 (1.2-3.8) - parenthetical CI without label
+        r"(?:or|odds\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*\((\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\)",
+        # Standalone OR = 2.5 or OR: 2.5 (no CI)
+        r"(?:or|odds\s+ratio)\s*[=:,]\s*(\d+(?:\.\d+)?)(?!\s*%)",
+        # aOR = 2.5 (no CI)
+        r"(?:aor|adjusted\s+odds\s+ratio)\s*[=:,]\s*(\d+(?:\.\d+)?)(?!\s*%)",
     ]
 
     for pattern in patterns:
-        for match in re.finditer(pattern, text, re.IGNORECASE):
+        for match in re.finditer(pattern, normalized, re.IGNORECASE):
             groups = match.groups()
+
+            # Parse based on number of captured groups
+            if len(groups) == 4:
+                # (or_value, ci_level?, ci_lower, ci_upper)
+                or_value = float(groups[0])
+                ci_lower = float(groups[2])
+                ci_upper = float(groups[3])
+            elif len(groups) == 3:
+                # (or_value, ci_lower, ci_upper)
+                or_value = float(groups[0])
+                ci_lower = float(groups[1])
+                ci_upper = float(groups[2])
+            else:
+                # (or_value) only
+                or_value = float(groups[0])
+                ci_lower = None
+                ci_upper = None
+
             result = {
-                "value": float(groups[0]),
-                "ci_lower": float(groups[1]) if len(groups) > 1 and groups[1] else None,
-                "ci_upper": float(groups[2]) if len(groups) > 2 and groups[2] else None,
-                "context": text[max(0, match.start() - 50) : match.end() + 50],
+                "value": or_value,
+                "ci_lower": ci_lower,
+                "ci_upper": ci_upper,
+                "context": normalized[max(0, match.start() - 50) : match.end() + 50],
                 "page": page,
             }
-            # Avoid duplicates (compare without page for dedup within same page)
+
+            # Avoid duplicates on same page
             if not any(
                 r["value"] == result["value"]
                 and r["ci_lower"] == result["ci_lower"]
@@ -91,35 +131,53 @@ def find_confidence_intervals(text: str, page: int = 1) -> list[dict]:
     """
     results = []
 
-    # Pattern: 95% CI: 1.2-3.8 or CI (1.2, 3.8) or confidence interval, 1.4 to 3.4
+    # Normalize text for consistent matching
+    normalized = _normalize_text(text)
+
+    # Comprehensive CI patterns
+    # Number pattern: \d+(?:\.\d+)? matches "2" or "2.5" but not "2."
     patterns = [
-        # 95% CI: 1.2-3.8 or 95% CI: 1.2 to 3.8
-        r"(?:(\d+)%?\s*CI)[:\s]*\(?(\d+\.?\d*)\s*(?:[-–,]|to)\s*(\d+\.?\d*)\)?",
-        # 95% confidence interval, 1.4 to 3.4 or confidence interval, 1.4 to 3.4
-        r"(?:(\d+)%?\s*)?confidence interval[,:\s]+(\d+\.?\d*)\s*(?:[-–]|to)\s*(\d+\.?\d*)",
-        # (1.2, 3.8) or (1.2-3.8) or (1.2 to 3.8)
-        r"\((\d+\.?\d*)\s*(?:[-–,]|to)\s*(\d+\.?\d*)\)",
+        # 95% CI: 1.2-3.8 or 95% CI 1.2-3.8 or 95% CI (1.2-3.8)
+        r"(\d+)%?\s*ci[:\s]*\(?(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\)?",
+        # 95% confidence interval, 1.4 to 3.4
+        r"(\d+)%?\s*confidence\s+interval[,:\s]+(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)",
+        # confidence interval, 1.4 to 3.4 (no percentage)
+        r"confidence\s+interval[,:\s]+(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)",
+        # confidence interval of 1.4 to 3.4
+        r"confidence\s+interval\s+of\s+(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)",
+        # CI: 1.2 to 3.8 or CI = 1.2-3.8 or CI 1.2-3.8
+        r"\bci[:\s=]+(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)",
+        # (1.2-3.8) ONLY when preceded by CI or confidence interval
+        r"(?:ci|confidence\s+interval)[,:\s]*\((\d+(?:\.\d+)?)\s*(?:[-,]|to)\s*(\d+(?:\.\d+)?)\)",
     ]
 
     for pattern in patterns:
-        for match in re.finditer(pattern, text, re.IGNORECASE):
+        for match in re.finditer(pattern, normalized, re.IGNORECASE):
             groups = match.groups()
+
+            # Parse based on number of captured groups
             if len(groups) >= 3:
-                result = {
-                    "level": int(groups[0]) if groups[0] else 95,
-                    "lower": float(groups[1]),
-                    "upper": float(groups[2]),
-                    "context": text[max(0, match.start() - 30) : match.end() + 30],
-                    "page": page,
-                }
+                level = int(groups[0]) if groups[0] else 95
+                lower = float(groups[1])
+                upper = float(groups[2])
             else:
-                result = {
-                    "level": 95,
-                    "lower": float(groups[0]),
-                    "upper": float(groups[1]),
-                    "context": text[max(0, match.start() - 30) : match.end() + 30],
-                    "page": page,
-                }
+                level = 95
+                lower = float(groups[0])
+                upper = float(groups[1])
+
+            # Validate CI values
+            if lower > 100 or upper > 100:
+                continue  # Skip year-like ranges
+            if lower >= upper:
+                continue  # Skip invalid CI
+
+            result = {
+                "level": level,
+                "lower": lower,
+                "upper": upper,
+                "context": normalized[max(0, match.start() - 30) : match.end() + 30],
+                "page": page,
+            }
 
             # Avoid duplicates on same page
             if not any(
