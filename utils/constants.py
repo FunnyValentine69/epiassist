@@ -18,7 +18,7 @@ NODE_COLORS: dict[str, str] = {
     "exposure": "#FF6B6B",  # Coral red
     "outcome": "#4ECDC4",   # Teal
     "confounder": "#FFE66D",  # Yellow
-    "mediator": "#95E1D3",  # Mint green
+    "mediator": "#A78BFA",  # Purple
 }
 
 # Demo data for Hearing Loss and Unemployment study

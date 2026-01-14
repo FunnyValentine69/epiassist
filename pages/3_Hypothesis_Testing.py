@@ -137,7 +137,7 @@ if generate_btn and research_question:
         st.session_state.hypo_h1 = parsed["h1"] if parsed["h1"] else st.session_state.get("hypo_h1", "")
         st.success("Generated! Fields auto-filled below.")
     else:
-        st.error("Ollama not available. Please enter hypotheses manually.")
+        st.info("AI auto-generation requires local Ollama installation.")
 
 # Show AI response if available
 if "hypo_ai_response" in st.session_state:

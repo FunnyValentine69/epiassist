@@ -125,11 +125,11 @@ with col2:
         # Legend
         st.markdown("""
         **Legend:**
-        🔴 Exposure |
-        🟢 Outcome |
-        🟡 Confounder |
-        🟢 Mediator
-        """)
+        <span style="color:#FF6B6B">&#9679;</span> Exposure |
+        <span style="color:#4ECDC4">&#9679;</span> Outcome |
+        <span style="color:#FFE66D">&#9679;</span> Confounder |
+        <span style="color:#A78BFA">&#9679;</span> Mediator
+        """, unsafe_allow_html=True)
     else:
         st.info("Add variables and relationships to see your DAG here.")
 

@@ -41,11 +41,14 @@ def find_odds_ratios(text: str) -> list[dict]:
 
     # Pattern: OR = 2.5 or OR: 2.5 or odds ratio of 2.5
     # With optional CI: OR = 2.5 (95% CI: 1.2-3.8) or OR = 2.5 (1.2, 3.8)
+    # Note: Patterns require explicit delimiters to avoid matching page numbers
     patterns = [
-        # OR = 2.5 (95% CI: 1.2-3.8)
+        # OR = 2.5 (95% CI: 1.2-3.8) or OR: 2.5 (1.2-3.8)
         r"(?:OR|odds ratio)[:\s=]+(\d+\.?\d*)\s*\(?\s*(?:95%?\s*CI)?[:\s]*(\d+\.?\d*)\s*[-–,]\s*(\d+\.?\d*)\s*\)?",
-        # OR = 2.5
-        r"(?:OR|odds ratio)[:\s=]+(\d+\.?\d*)",
+        # OR = 2.5 or OR: 2.5 (requires = or :, excludes percentages)
+        r"(?:OR|odds ratio)\s*[=:]\s*(\d+\.?\d*)(?!\s*%)",
+        # OR 2.5 (95% CI - requires CI to follow to avoid false positives
+        r"(?:OR|odds ratio)\s+(\d+\.?\d*)\s*\(\s*95%?\s*CI",
         # aOR = 2.5 (adjusted OR)
         r"(?:aOR|adjusted odds ratio)[:\s=]+(\d+\.?\d*)\s*\(?\s*(?:95%?\s*CI)?[:\s]*(\d+\.?\d*)\s*[-–,]\s*(\d+\.?\d*)\s*\)?",
     ]
@@ -79,8 +82,10 @@ def find_confidence_intervals(text: str) -> list[dict]:
 
     # Pattern: 95% CI: 1.2-3.8 or CI (1.2, 3.8) or (95% CI 1.2 to 3.8)
     patterns = [
-        r"(?:(\d+)%?\s*CI)[:\s]*\(?(\d+\.?\d*)\s*[-–,to]\s*(\d+\.?\d*)\)?",
-        r"\((\d+\.?\d*)\s*[-–,]\s*(\d+\.?\d*)\)",
+        # 95% CI: 1.2-3.8 or 95% CI: 1.2 to 3.8
+        r"(?:(\d+)%?\s*CI)[:\s]*\(?(\d+\.?\d*)\s*(?:[-–,]|to)\s*(\d+\.?\d*)\)?",
+        # (1.2, 3.8) or (1.2-3.8) or (1.2 to 3.8)
+        r"\((\d+\.?\d*)\s*(?:[-–,]|to)\s*(\d+\.?\d*)\)",
     ]
 
     for pattern in patterns:
