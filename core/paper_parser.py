@@ -20,6 +20,12 @@ def _normalize_text(text: str) -> str:
     """
     # Replace en-dash, em-dash, and Unicode minus with hyphen
     text = text.replace("–", "-").replace("—", "-").replace("−", "-")
+    # Replace non-breaking space with regular space
+    text = text.replace("\u00a0", " ")
+    # Remove soft hyphens (U+00AD) - used for optional line breaks
+    text = text.replace("\u00ad", "")
+    # Fix hyphenated word breaks (e.g., "confi-\ndence" → "confidence")
+    text = re.sub(r"-\s*\n\s*", "", text)
     # Standardize whitespace (collapse multiple spaces, normalize newlines)
     text = re.sub(r"\s+", " ", text)
     return text
@@ -136,11 +142,12 @@ def find_confidence_intervals(text: str, page: int = 1) -> list[dict]:
 
     # Comprehensive CI patterns
     # Number pattern: \d+(?:\.\d+)? matches "2" or "2.5" but not "2."
+    # Note: \s*%?\s* handles "95%", "95 %", "95 % ", and "95" (no percent)
     patterns = [
         # 95% CI: 1.2-3.8 or 95% CI 1.2-3.8 or 95% CI (1.2-3.8)
-        r"(\d+)%?\s*ci[:\s]*\(?(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\)?",
+        r"(\d+)\s*%?\s*ci[:\s]*\(?(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\)?",
         # 95% confidence interval, 1.4 to 3.4
-        r"(\d+)%?\s*confidence\s+interval[,:\s]+(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)",
+        r"(\d+)\s*%?\s*confidence\s+interval[,:\s]+(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)",
         # confidence interval, 1.4 to 3.4 (no percentage)
         r"confidence\s+interval[,:\s]+(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)",
         # confidence interval of 1.4 to 3.4
