@@ -9,48 +9,51 @@ import re
 import fitz  # PyMuPDF
 
 
-def extract_text_from_pdf(file_bytes: bytes) -> str:
-    """Extract text content from a PDF file.
+def extract_text_from_pdf(file_bytes: bytes) -> list[tuple[int, str]]:
+    """Extract text content from a PDF file by page.
 
     Args:
         file_bytes: PDF file contents as bytes.
 
     Returns:
-        Extracted text as a single string.
+        List of (page_number, text) tuples. Page numbers are 1-indexed.
     """
     doc = fitz.open(stream=file_bytes, filetype="pdf")
-    text_parts = []
+    pages = []
 
-    for page in doc:
-        text_parts.append(page.get_text())
+    for page_num, page in enumerate(doc, start=1):
+        pages.append((page_num, page.get_text()))
 
     doc.close()
-    return "\n".join(text_parts)
+    return pages
 
 
-def find_odds_ratios(text: str) -> list[dict]:
+def find_odds_ratios(text: str, page: int = 1) -> list[dict]:
     """Find odds ratios mentioned in text.
 
     Args:
         text: Text to search.
+        page: Page number where this text was found.
 
     Returns:
-        List of dicts with 'value', 'ci_lower', 'ci_upper', 'context'.
+        List of dicts with 'value', 'ci_lower', 'ci_upper', 'context', 'page'.
     """
     results = []
 
-    # Pattern: OR = 2.5 or OR: 2.5 or odds ratio of 2.5
+    # Pattern: OR = 2.5 or OR: 2.5 or odds ratio, 2.5
     # With optional CI: OR = 2.5 (95% CI: 1.2-3.8) or OR = 2.5 (1.2, 3.8)
     # Note: Patterns require explicit delimiters to avoid matching page numbers
     patterns = [
         # OR = 2.5 (95% CI: 1.2-3.8) or OR: 2.5 (1.2-3.8)
-        r"(?:OR|odds ratio)[:\s=]+(\d+\.?\d*)\s*\(?\s*(?:95%?\s*CI)?[:\s]*(\d+\.?\d*)\s*[-–,]\s*(\d+\.?\d*)\s*\)?",
-        # OR = 2.5 or OR: 2.5 (requires = or :, excludes percentages)
-        r"(?:OR|odds ratio)\s*[=:]\s*(\d+\.?\d*)(?!\s*%)",
+        r"(?:OR|odds ratio)[,:\s=]+(\d+\.?\d*)\s*\(?\s*(?:95%?\s*CI)?[:\s]*(\d+\.?\d*)\s*[-–,]\s*(\d+\.?\d*)\s*\)?",
+        # OR = 2.5 or OR: 2.5 or OR, 2.5 (requires = or : or comma, excludes percentages)
+        r"(?:OR|odds ratio)\s*[=:,]\s*(\d+\.?\d*)(?!\s*%)",
         # OR 2.5 (95% CI - requires CI to follow to avoid false positives
         r"(?:OR|odds ratio)\s+(\d+\.?\d*)\s*\(\s*95%?\s*CI",
-        # aOR = 2.5 (adjusted OR)
-        r"(?:aOR|adjusted odds ratio)[:\s=]+(\d+\.?\d*)\s*\(?\s*(?:95%?\s*CI)?[:\s]*(\d+\.?\d*)\s*[-–,]\s*(\d+\.?\d*)\s*\)?",
+        # aOR = 2.5 or adjusted odds ratio, 2.5
+        r"(?:aOR|adjusted odds ratio)[,:\s=]+(\d+\.?\d*)\s*\(?\s*(?:95%?\s*CI)?[:\s]*(\d+\.?\d*)\s*[-–,]\s*(\d+\.?\d*)\s*\)?",
+        # adjusted odds ratio, 2.5 (standalone with comma)
+        r"adjusted odds ratio\s*,\s*(\d+\.?\d*)(?!\s*%)",
     ]
 
     for pattern in patterns:
@@ -61,29 +64,39 @@ def find_odds_ratios(text: str) -> list[dict]:
                 "ci_lower": float(groups[1]) if len(groups) > 1 and groups[1] else None,
                 "ci_upper": float(groups[2]) if len(groups) > 2 and groups[2] else None,
                 "context": text[max(0, match.start() - 50) : match.end() + 50],
+                "page": page,
             }
-            # Avoid duplicates
-            if result not in results:
+            # Avoid duplicates (compare without page for dedup within same page)
+            if not any(
+                r["value"] == result["value"]
+                and r["ci_lower"] == result["ci_lower"]
+                and r["ci_upper"] == result["ci_upper"]
+                and r["page"] == result["page"]
+                for r in results
+            ):
                 results.append(result)
 
     return results
 
 
-def find_confidence_intervals(text: str) -> list[dict]:
+def find_confidence_intervals(text: str, page: int = 1) -> list[dict]:
     """Find confidence intervals mentioned in text.
 
     Args:
         text: Text to search.
+        page: Page number where this text was found.
 
     Returns:
-        List of dicts with 'lower', 'upper', 'level', 'context'.
+        List of dicts with 'lower', 'upper', 'level', 'context', 'page'.
     """
     results = []
 
-    # Pattern: 95% CI: 1.2-3.8 or CI (1.2, 3.8) or (95% CI 1.2 to 3.8)
+    # Pattern: 95% CI: 1.2-3.8 or CI (1.2, 3.8) or confidence interval, 1.4 to 3.4
     patterns = [
         # 95% CI: 1.2-3.8 or 95% CI: 1.2 to 3.8
         r"(?:(\d+)%?\s*CI)[:\s]*\(?(\d+\.?\d*)\s*(?:[-–,]|to)\s*(\d+\.?\d*)\)?",
+        # 95% confidence interval, 1.4 to 3.4 or confidence interval, 1.4 to 3.4
+        r"(?:(\d+)%?\s*)?confidence interval[,:\s]+(\d+\.?\d*)\s*(?:[-–]|to)\s*(\d+\.?\d*)",
         # (1.2, 3.8) or (1.2-3.8) or (1.2 to 3.8)
         r"\((\d+\.?\d*)\s*(?:[-–,]|to)\s*(\d+\.?\d*)\)",
     ]
@@ -97,6 +110,7 @@ def find_confidence_intervals(text: str) -> list[dict]:
                     "lower": float(groups[1]),
                     "upper": float(groups[2]),
                     "context": text[max(0, match.start() - 30) : match.end() + 30],
+                    "page": page,
                 }
             else:
                 result = {
@@ -104,28 +118,38 @@ def find_confidence_intervals(text: str) -> list[dict]:
                     "lower": float(groups[0]),
                     "upper": float(groups[1]),
                     "context": text[max(0, match.start() - 30) : match.end() + 30],
+                    "page": page,
                 }
 
-            if result not in results:
+            # Avoid duplicates on same page
+            if not any(
+                r["lower"] == result["lower"]
+                and r["upper"] == result["upper"]
+                and r["page"] == result["page"]
+                for r in results
+            ):
                 results.append(result)
 
     return results
 
 
-def find_p_values(text: str) -> list[dict]:
+def find_p_values(text: str, page: int = 1) -> list[dict]:
     """Find p-values mentioned in text.
 
     Args:
         text: Text to search.
+        page: Page number where this text was found.
 
     Returns:
-        List of dicts with 'value', 'operator', 'context'.
+        List of dicts with 'value', 'operator', 'context', 'page'.
     """
     results = []
 
     # Patterns: p < 0.05, p = 0.001, P-value: 0.03, p<.001
     patterns = [
+        # p < 0.05 or p < .05 - captures operator and digits after decimal
         r"[Pp][-\s]?(?:value)?[:\s]*([<>=≤≥])\s*0?\.?(\d+)",
+        # p = 0.001 (full decimal format)
         r"[Pp][-\s]?(?:value)?[:\s]*(\d+\.?\d*(?:e-?\d+)?)",
     ]
 
@@ -134,14 +158,13 @@ def find_p_values(text: str) -> list[dict]:
             groups = match.groups()
 
             if len(groups) == 2:
-                # Pattern with operator
+                # Pattern with operator - digits are after the decimal point
                 operator = groups[0]
                 value_str = groups[1]
-                if not value_str.startswith("0"):
-                    value_str = "0." + value_str
-                value = float(value_str)
+                # Always prepend "0." since pattern consumed the "0." prefix
+                value = float("0." + value_str)
             else:
-                # Pattern without operator
+                # Pattern without operator - full decimal number
                 operator = "="
                 value = float(groups[0])
 
@@ -149,36 +172,54 @@ def find_p_values(text: str) -> list[dict]:
                 "value": value,
                 "operator": operator,
                 "context": text[max(0, match.start() - 30) : match.end() + 30],
+                "page": page,
             }
 
-            if result not in results:
+            # Avoid duplicates on same page
+            if not any(
+                r["value"] == result["value"]
+                and r["operator"] == result["operator"]
+                and r["page"] == result["page"]
+                for r in results
+            ):
                 results.append(result)
 
     return results
 
 
-def find_sample_sizes(text: str) -> list[int]:
+def find_sample_sizes(text: str, page: int = 1) -> list[dict]:
     """Find sample sizes mentioned in text.
 
     Args:
         text: Text to search.
+        page: Page number where this text was found.
 
     Returns:
-        List of sample size integers.
+        List of dicts with 'value', 'page'. Minimum threshold is 50.
     """
     results = []
 
-    # Patterns: n = 500, N=1000, sample size of 500, n: 500
+    # Patterns support comma-separated numbers (e.g., 933,921)
     patterns = [
-        r"[Nn][:\s=]+(\d{2,})",
-        r"sample\s+size[:\s=of]+(\d+)",
-        r"(\d+)\s+(?:participants|subjects|patients|individuals)",
+        # n = 933,921 or N = 500 or n: 500
+        r"[Nn]\s*[=:]\s*([\d,]+)",
+        # sample size of 1,234
+        r"sample\s+size\s+(?:of\s+)?([\d,]+)",
+        # 933,921 ± 88,474 adults/patients/participants/subjects/individuals
+        r"([\d,]+)\s*[±]\s*[\d,]+\s+(?:adults|patients|participants|subjects|individuals)",
+        # 933,921 adults/patients/participants/subjects/individuals
+        r"([\d,]+)\s+(?:adults|patients|participants|subjects|individuals)",
     ]
 
     for pattern in patterns:
         for match in re.finditer(pattern, text, re.IGNORECASE):
-            value = int(match.group(1))
-            if value not in results and value >= 10:  # Filter out small numbers
-                results.append(value)
+            # Strip commas and convert to int
+            value = int(match.group(1).replace(",", ""))
+            # Filter out small numbers (likely references)
+            if value >= 50:
+                # Avoid duplicates on same page
+                if not any(r["value"] == value and r["page"] == page for r in results):
+                    results.append({"value": value, "page": page})
 
-    return sorted(set(results), reverse=True)
+    # Sort by value descending
+    return sorted(results, key=lambda x: x["value"], reverse=True)

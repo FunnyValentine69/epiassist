@@ -52,20 +52,27 @@ with col2:
 
     if uploaded_file is not None and extract_btn:
         with st.spinner("Extracting text from PDF..."):
-            # Read PDF bytes and extract text
+            # Read PDF bytes and extract text by page
             file_bytes = uploaded_file.read()
-            text = extract_text_from_pdf(file_bytes)
+            pages = extract_text_from_pdf(file_bytes)
 
-            # Store in session state
-            st.session_state.paper_text = text
+            # Store full text for preview (join all pages)
+            full_text = "\n".join(text for _, text in pages)
+            st.session_state.paper_text = full_text
             st.session_state.paper_filename = uploaded_file.name
 
         with st.spinner("Finding statistics..."):
-            # Extract all statistics
-            odds_ratios = find_odds_ratios(text)
-            confidence_intervals = find_confidence_intervals(text)
-            p_values = find_p_values(text)
-            sample_sizes = find_sample_sizes(text)
+            # Extract statistics from each page
+            odds_ratios = []
+            confidence_intervals = []
+            p_values = []
+            sample_sizes = []
+
+            for page_num, text in pages:
+                odds_ratios.extend(find_odds_ratios(text, page=page_num))
+                confidence_intervals.extend(find_confidence_intervals(text, page=page_num))
+                p_values.extend(find_p_values(text, page=page_num))
+                sample_sizes.extend(find_sample_sizes(text, page=page_num))
 
             # Store results
             st.session_state.paper_results = {
@@ -92,6 +99,7 @@ with col2:
                 for item in results["odds_ratios"]:
                     or_data.append(
                         {
+                            "Page": item["page"],
                             "OR Value": item["value"],
                             "CI Lower": item["ci_lower"] or "-",
                             "CI Upper": item["ci_upper"] or "-",
@@ -109,6 +117,7 @@ with col2:
                 for item in results["confidence_intervals"]:
                     ci_data.append(
                         {
+                            "Page": item["page"],
                             "Level": f"{item['level']}%",
                             "Lower": item["lower"],
                             "Upper": item["upper"],
@@ -128,6 +137,7 @@ with col2:
                 for item in results["p_values"]:
                     p_data.append(
                         {
+                            "Page": item["page"],
                             "P-value": item["value"],
                             "Operator": item["operator"],
                             "Significant (α=0.05)": "Yes" if item["value"] < 0.05 else "No",
@@ -141,13 +151,16 @@ with col2:
 
         with tab4:
             if results["sample_sizes"]:
-                st.markdown("**Detected sample sizes:**")
-                for n in results["sample_sizes"][:10]:  # Show top 10
-                    st.markdown(f"- n = {n:,}")
-                if len(results["sample_sizes"]) > 10:
-                    st.caption(
-                        f"...and {len(results['sample_sizes']) - 10} more"
+                n_data = []
+                for item in results["sample_sizes"]:
+                    n_data.append(
+                        {
+                            "Page": item["page"],
+                            "Sample Size": f"n = {item['value']:,}",
+                        }
                     )
+                st.dataframe(pd.DataFrame(n_data), use_container_width=True)
+                st.caption(f"Found {len(results['sample_sizes'])} sample size(s)")
             else:
                 st.info("No sample sizes found in this document.")
 
@@ -161,6 +174,7 @@ with col2:
                 export_rows.append(
                     {
                         "Type": "Odds Ratio",
+                        "Page": item["page"],
                         "Value": item["value"],
                         "CI Lower": item["ci_lower"],
                         "CI Upper": item["ci_upper"],
@@ -172,9 +186,19 @@ with col2:
                 export_rows.append(
                     {
                         "Type": "P-value",
+                        "Page": item["page"],
                         "Value": item["value"],
                         "Operator": item["operator"],
                         "Context": item["context"],
+                    }
+                )
+
+            for item in results["sample_sizes"]:
+                export_rows.append(
+                    {
+                        "Type": "Sample Size",
+                        "Page": item["page"],
+                        "Value": item["value"],
                     }
                 )
 
