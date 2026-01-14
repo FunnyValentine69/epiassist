@@ -51,38 +51,46 @@ with col2:
     st.markdown("### Extracted Statistics")
 
     if uploaded_file is not None and extract_btn:
-        with st.spinner("Extracting text from PDF..."):
-            # Read PDF bytes and extract text by page
-            file_bytes = uploaded_file.read()
-            pages = extract_text_from_pdf(file_bytes)
+        try:
+            with st.spinner("Extracting text from PDF..."):
+                # Read PDF bytes and extract text by page
+                file_bytes = uploaded_file.read()
+                pages = extract_text_from_pdf(file_bytes)
 
-            # Store full text for preview (join all pages)
-            full_text = "\n".join(text for _, text in pages)
-            st.session_state.paper_text = full_text
-            st.session_state.paper_filename = uploaded_file.name
+                # Validate extraction result
+                if not pages:
+                    st.error("Could not extract text from PDF. The file may be empty or corrupted.")
+                    st.stop()
 
-        with st.spinner("Finding statistics..."):
-            # Extract statistics from each page
-            odds_ratios = []
-            confidence_intervals = []
-            p_values = []
-            sample_sizes = []
+                # Store full text for preview (join all pages)
+                full_text = "\n".join(page_text for page_num, page_text in pages)
+                st.session_state.paper_text = full_text
+                st.session_state.paper_filename = uploaded_file.name
 
-            for page_num, text in pages:
-                odds_ratios.extend(find_odds_ratios(text, page=page_num))
-                confidence_intervals.extend(find_confidence_intervals(text, page=page_num))
-                p_values.extend(find_p_values(text, page=page_num))
-                sample_sizes.extend(find_sample_sizes(text, page=page_num))
+            with st.spinner("Finding statistics..."):
+                # Extract statistics from each page
+                odds_ratios = []
+                confidence_intervals = []
+                p_values = []
+                sample_sizes = []
 
-            # Store results
-            st.session_state.paper_results = {
-                "odds_ratios": odds_ratios,
-                "confidence_intervals": confidence_intervals,
-                "p_values": p_values,
-                "sample_sizes": sample_sizes,
-            }
+                for page_num, page_text in pages:
+                    odds_ratios.extend(find_odds_ratios(page_text, page=page_num))
+                    confidence_intervals.extend(find_confidence_intervals(page_text, page=page_num))
+                    p_values.extend(find_p_values(page_text, page=page_num))
+                    sample_sizes.extend(find_sample_sizes(page_text, page=page_num))
 
-        st.success("Extraction complete.")
+                # Store results
+                st.session_state.paper_results = {
+                    "odds_ratios": odds_ratios,
+                    "confidence_intervals": confidence_intervals,
+                    "p_values": p_values,
+                    "sample_sizes": sample_sizes,
+                }
+
+            st.success("Extraction complete.")
+        except Exception as e:
+            st.error(f"Error processing PDF: {e}")
 
     # Display results if available
     if "paper_results" in st.session_state:
