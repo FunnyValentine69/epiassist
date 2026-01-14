@@ -200,15 +200,16 @@ def find_sample_sizes(text: str, page: int = 1) -> list[dict]:
     results = []
 
     # Patterns support comma-separated numbers (e.g., 933,921)
+    # Use \d[\d,]* to require at least one digit ([\d,]+ could match just commas)
     patterns = [
         # n = 933,921 or N = 500 or n: 500
-        r"[Nn]\s*[=:]\s*([\d,]+)",
+        r"[Nn]\s*[=:]\s*(\d[\d,]*)",
         # sample size of 1,234
-        r"sample\s+size\s+(?:of\s+)?([\d,]+)",
+        r"sample\s+size\s+(?:of\s+)?(\d[\d,]*)",
         # 933,921 ± 88,474 adults/patients/participants/subjects/individuals
-        r"([\d,]+)\s*[±]\s*[\d,]+\s+(?:adults|patients|participants|subjects|individuals)",
+        r"(\d[\d,]*)\s*[±]\s*\d[\d,]*\s+(?:adults|patients|participants|subjects|individuals)",
         # 933,921 adults/patients/participants/subjects/individuals
-        r"([\d,]+)\s+(?:adults|patients|participants|subjects|individuals)",
+        r"(\d[\d,]*)\s+(?:adults|patients|participants|subjects|individuals)",
     ]
 
     for pattern in patterns:
