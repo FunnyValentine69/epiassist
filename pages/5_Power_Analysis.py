@@ -172,7 +172,7 @@ with tab1:
                     height=350,
                 )
 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
         else:
             st.warning("Calculate sample size to see power curve.")
 

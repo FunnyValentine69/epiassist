@@ -114,7 +114,7 @@ with col2:
                             "Context": item["context"][:80] + "...",
                         }
                     )
-                st.dataframe(pd.DataFrame(or_data), use_container_width=True)
+                st.dataframe(pd.DataFrame(or_data), width="stretch")
                 st.caption(f"Found {len(results['odds_ratios'])} odds ratio(s)")
             else:
                 st.info("No odds ratios found in this document.")
@@ -132,7 +132,7 @@ with col2:
                             "Context": item["context"][:60] + "...",
                         }
                     )
-                st.dataframe(pd.DataFrame(ci_data), use_container_width=True)
+                st.dataframe(pd.DataFrame(ci_data), width="stretch")
                 st.caption(
                     f"Found {len(results['confidence_intervals'])} confidence interval(s)"
                 )
@@ -152,7 +152,7 @@ with col2:
                             "Context": item["context"][:60] + "...",
                         }
                     )
-                st.dataframe(pd.DataFrame(p_data), use_container_width=True)
+                st.dataframe(pd.DataFrame(p_data), width="stretch")
                 st.caption(f"Found {len(results['p_values'])} p-value(s)")
             else:
                 st.info("No p-values found in this document.")
@@ -167,7 +167,7 @@ with col2:
                             "Sample Size": f"n = {item['value']:,}",
                         }
                     )
-                st.dataframe(pd.DataFrame(n_data), use_container_width=True)
+                st.dataframe(pd.DataFrame(n_data), width="stretch")
                 st.caption(f"Found {len(results['sample_sizes'])} sample size(s)")
             else:
                 st.info("No sample sizes found in this document.")

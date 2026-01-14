@@ -10,7 +10,7 @@ An epidemiological research assistant for causal inference, statistical analysis
 
 - **Hypothesis Framework**: Structure your research questions into formal null and alternative hypotheses. Get study design recommendations and bias checklists.
 
-- **Paper Analyzer**: Upload epidemiological papers (PDF) and automatically extract reported statistics including odds ratios, confidence intervals, p-values, and sample sizes.
+- **Paper Analyzer**: Upload epidemiological papers (PDF) and automatically extract reported statistics including odds ratios, confidence intervals, p-values, and sample sizes. Includes page citations for each extracted statistic. Handles PDF text quirks (hyphenation, en-dash, Unicode encoding). Validated against published research (Jung & Bhattacharyya 2012).
 
 - **Power Analysis**: Calculate required sample sizes, generate power curves, and perform E-value sensitivity analysis for unmeasured confounding.
 
