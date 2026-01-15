@@ -50,79 +50,128 @@ def extract_text_from_pdf(file_bytes: bytes) -> list[tuple[int, str]]:
     return pages
 
 
-def find_odds_ratios(text: str, page: int = 1) -> list[dict]:
-    """Find odds ratios mentioned in text.
+def find_effect_measures(text: str, page: int = 1) -> list[dict]:
+    """Find effect measures (OR, HR, RR, PR, IRR, β) mentioned in text.
 
     Args:
         text: Text to search.
         page: Page number where this text was found.
 
     Returns:
-        List of dicts with 'value', 'ci_lower', 'ci_upper', 'context', 'page'.
+        List of dicts with 'type', 'value', 'ci_lower', 'ci_upper', 'context', 'page'.
     """
     results = []
 
     # Normalize text for consistent matching
     normalized = _normalize_text(text)
 
-    # Enhanced patterns to capture OR + CI together
+    # Effect measure patterns organized by type
+    # Each list: most specific (with CI) first, standalone last
     # Number pattern: \d+(?:\.\d+)? matches "2" or "2.5" but not "2."
-    # Patterns with CI come first (more specific)
-    patterns = [
-        # OR 2.2 (95% confidence interval, 1.4 to 3.4)
-        r"(?:or|odds\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*\(\s*(?:(\d+)%?\s*)?confidence\s+interval[,:\s]+(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*\)",
-        # OR 2.5 (95% CI: 1.2-3.8) or OR 2.5 (95% CI 1.2-3.8)
-        r"(?:or|odds\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*\(\s*(?:(\d+)%?\s*)?ci[:\s]*(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*\)",
-        # adjusted odds ratio, 2.5; 95% CI 1.6-3.9
-        r"(?:aor|adjusted\s+odds\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*[;,]?\s*(?:(\d+)%?\s*)?ci[:\s]*(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)",
-        # OR 2.5 (1.2-3.8) - parenthetical CI without label
-        r"(?:or|odds\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*\((\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\)",
-        # Standalone OR = 2.5 or OR: 2.5 (no CI)
-        r"(?:or|odds\s+ratio)\s*[=:,]\s*(\d+(?:\.\d+)?)(?!\s*%)",
-        # aOR = 2.5 (no CI)
-        r"(?:aor|adjusted\s+odds\s+ratio)\s*[=:,]\s*(\d+(?:\.\d+)?)(?!\s*%)",
-    ]
+    effect_patterns = {
+        "OR": [
+            # OR 2.2 (95% confidence interval, 1.4 to 3.4)
+            r"(?:or|odds\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*\(\s*(?:(\d+)%?\s*)?confidence\s+interval[,:\s]+(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*\)",
+            # OR 2.5 (95% CI: 1.2-3.8)
+            r"(?:or|odds\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*\(\s*(?:(\d+)%?\s*)?ci[:\s]*(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*\)",
+            # aOR 2.5; 95% CI 1.6-3.9
+            r"(?:aor|adjusted\s+odds\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*[;,]?\s*(?:(\d+)%?\s*)?ci[:\s]*(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)",
+            # OR 2.5 (1.2-3.8) - parenthetical CI
+            r"(?:or|odds\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*\((\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\)",
+            # Standalone OR = 2.5
+            r"(?:or|odds\s+ratio)\s*[=:,]\s*(\d+(?:\.\d+)?)(?!\s*%)",
+            # Standalone aOR = 2.5
+            r"(?:aor|adjusted\s+odds\s+ratio)\s*[=:,]\s*(\d+(?:\.\d+)?)(?!\s*%)",
+        ],
+        "HR": [
+            # HR 1.45 (95% CI: 1.12-1.89)
+            r"(?:a?hr|(?:adjusted\s+)?hazard\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*\(\s*(?:(\d+)%?\s*)?ci[:\s]*(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*\)",
+            # HR 1.45 (1.12-1.89) - parenthetical CI
+            r"(?:a?hr|(?:adjusted\s+)?hazard\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*\((\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\)",
+            # Standalone HR = 1.45
+            r"(?:a?hr|(?:adjusted\s+)?hazard\s+ratio)\s*[=:,]\s*(\d+(?:\.\d+)?)(?!\s*%)",
+        ],
+        "RR": [
+            # RR 0.85 (95% CI: 0.72-0.99)
+            r"(?:a?rr|(?:adjusted\s+)?(?:relative\s+risk|risk\s+ratio))[,:\s=]+(\d+(?:\.\d+)?)\s*\(\s*(?:(\d+)%?\s*)?ci[:\s]*(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*\)",
+            # RR 0.85 (0.72-0.99) - parenthetical CI
+            r"(?:a?rr|(?:adjusted\s+)?(?:relative\s+risk|risk\s+ratio))[,:\s=]+(\d+(?:\.\d+)?)\s*\((\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\)",
+            # Standalone RR = 0.85
+            r"(?:a?rr|(?:adjusted\s+)?(?:relative\s+risk|risk\s+ratio))\s*[=:,]\s*(\d+(?:\.\d+)?)(?!\s*%)",
+        ],
+        "PR": [
+            # PR 1.2 (95% CI: 1.1-1.4)
+            r"(?:a?pr|(?:adjusted\s+)?prevalence\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*\(\s*(?:(\d+)%?\s*)?ci[:\s]*(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*\)",
+            # PR 1.2 (1.1-1.4) - parenthetical CI
+            r"(?:a?pr|(?:adjusted\s+)?prevalence\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*\((\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\)",
+            # Standalone PR = 1.2
+            r"(?:a?pr|(?:adjusted\s+)?prevalence\s+ratio)\s*[=:,]\s*(\d+(?:\.\d+)?)(?!\s*%)",
+        ],
+        "IRR": [
+            # IRR 1.5 (95% CI: 1.2-1.9)
+            r"(?:irr|incidence\s+rate\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*\(\s*(?:(\d+)%?\s*)?ci[:\s]*(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*\)",
+            # IRR 1.5 (1.2-1.9) - parenthetical CI
+            r"(?:irr|incidence\s+rate\s+ratio)[,:\s=]+(\d+(?:\.\d+)?)\s*\((\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\)",
+            # Standalone IRR = 1.5
+            r"(?:irr|incidence\s+rate\s+ratio)\s*[=:,]\s*(\d+(?:\.\d+)?)(?!\s*%)",
+        ],
+        "β": [
+            # β = 0.45 (95% CI: 0.12-0.78)
+            r"(?:β|beta)\s*[=:,]\s*(-?\d+(?:\.\d+)?)\s*\(\s*(?:(\d+)%?\s*)?ci[:\s]*(-?\d+(?:\.\d+)?)\s*(?:-|to)\s*(-?\d+(?:\.\d+)?)\s*\)",
+            # Standalone β = 0.45
+            r"(?:β|beta)\s*[=:,]\s*(-?\d+(?:\.\d+)?)(?!\s*%)",
+        ],
+    }
 
-    for pattern in patterns:
-        for match in re.finditer(pattern, normalized, re.IGNORECASE):
-            groups = match.groups()
+    for measure_type, patterns in effect_patterns.items():
+        for pattern in patterns:
+            for match in re.finditer(pattern, normalized, re.IGNORECASE):
+                groups = match.groups()
 
-            # Parse based on number of captured groups
-            if len(groups) == 4:
-                # (or_value, ci_level?, ci_lower, ci_upper)
-                or_value = float(groups[0])
-                ci_lower = float(groups[2])
-                ci_upper = float(groups[3])
-            elif len(groups) == 3:
-                # (or_value, ci_lower, ci_upper)
-                or_value = float(groups[0])
-                ci_lower = float(groups[1])
-                ci_upper = float(groups[2])
-            else:
-                # (or_value) only
-                or_value = float(groups[0])
-                ci_lower = None
-                ci_upper = None
+                # Parse based on number of captured groups
+                if len(groups) == 4:
+                    # (value, ci_level?, ci_lower, ci_upper)
+                    value = float(groups[0])
+                    ci_lower = float(groups[2])
+                    ci_upper = float(groups[3])
+                elif len(groups) == 3:
+                    # (value, ci_lower, ci_upper)
+                    value = float(groups[0])
+                    ci_lower = float(groups[1])
+                    ci_upper = float(groups[2])
+                else:
+                    # (value) only
+                    value = float(groups[0])
+                    ci_lower = None
+                    ci_upper = None
 
-            result = {
-                "value": or_value,
-                "ci_lower": ci_lower,
-                "ci_upper": ci_upper,
-                "context": normalized[max(0, match.start() - 50) : match.end() + 50],
-                "page": page,
-            }
+                result = {
+                    "type": measure_type,
+                    "value": value,
+                    "ci_lower": ci_lower,
+                    "ci_upper": ci_upper,
+                    "context": normalized[max(0, match.start() - 50) : match.end() + 50],
+                    "page": page,
+                }
 
-            # Avoid duplicates on same page
-            if not any(
-                r["value"] == result["value"]
-                and r["ci_lower"] == result["ci_lower"]
-                and r["ci_upper"] == result["ci_upper"]
-                and r["page"] == result["page"]
-                for r in results
-            ):
-                results.append(result)
+                # Avoid duplicates (same type + value + CI on same page)
+                if not any(
+                    r["type"] == result["type"]
+                    and r["value"] == result["value"]
+                    and r["ci_lower"] == result["ci_lower"]
+                    and r["ci_upper"] == result["ci_upper"]
+                    and r["page"] == result["page"]
+                    for r in results
+                ):
+                    results.append(result)
 
     return results
+
+
+# Backward compatibility alias
+def find_odds_ratios(text: str, page: int = 1) -> list[dict]:
+    """Deprecated: Use find_effect_measures() instead."""
+    return find_effect_measures(text, page)
 
 
 def find_confidence_intervals(text: str, page: int = 1) -> list[dict]:

@@ -32,6 +32,13 @@
 │  │  (Plain English outputs)    │  │  (Reference values/limits)  │       │
 │  └─────────────────────────────┘  └─────────────────────────────┘       │
 └─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                             SCRIPTS                                      │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │  diagnose_extraction.py - Pattern debugging and extraction tests │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Module Responsibilities
@@ -112,11 +119,12 @@ def suggest_adjustment_set(dag: nx.DiGraph, exposure: str, outcome: str) -> list
 
 #### paper_parser.py
 ```python
-def extract_text_from_pdf(file_bytes: bytes) -> str
-def find_odds_ratios(text: str) -> list[dict]
-def find_confidence_intervals(text: str) -> list[dict]
-def find_p_values(text: str) -> list[dict]
-def find_sample_sizes(text: str) -> list[int]
+def extract_text_from_pdf(file_bytes: bytes) -> list[tuple[int, str]]
+def find_effect_measures(text: str, page: int = 1) -> list[dict]
+    # Returns dicts with: type (OR|HR|RR|PR|IRR|β), value, ci_lower, ci_upper, context, page
+def find_confidence_intervals(text: str, page: int = 1) -> list[dict]
+def find_p_values(text: str, page: int = 1) -> list[dict]
+def find_sample_sizes(text: str, page: int = 1) -> list[dict]
 ```
 
 #### power_calculator.py
@@ -276,6 +284,29 @@ st.session_state = {
     "power_sample_size": int | None
 }
 ```
+
+## Scripts
+
+### scripts/diagnose_extraction.py
+
+CLI tool for debugging Paper Analyzer extraction patterns.
+
+**Usage:**
+```bash
+python scripts/diagnose_extraction.py              # Default: test_papers/
+python scripts/diagnose_extraction.py ./my_papers  # Custom folder
+```
+
+**Outputs:**
+- `extracted_text/{filename}.txt` - Normalized text with page markers
+- `extraction_report.csv` - Per-pattern match counts for all PDFs
+- `extraction_summary.txt` - Totals and pattern legend
+
+**Pattern Tracking:**
+- Tracks individual pattern matches (32 patterns total)
+- Effect Measures: 20 patterns (OR: 6, HR: 3, RR: 3, PR: 3, IRR: 3, Beta: 2)
+- CI: 6 patterns, P-value: 2 patterns, Sample: 4 patterns
+- Note: Per-pattern counts may exceed totals due to deduplication
 
 ## Error Handling Strategy
 

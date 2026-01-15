@@ -5,7 +5,7 @@ import pandas as pd
 
 from core.paper_parser import (
     extract_text_from_pdf,
-    find_odds_ratios,
+    find_effect_measures,
     find_confidence_intervals,
     find_p_values,
     find_sample_sizes,
@@ -41,7 +41,7 @@ with col1:
 
     st.markdown("### What We Extract")
     st.markdown("""
-    - Odds Ratios (OR, aOR)
+    - Effect Measures (OR, HR, RR, PR, IRR, β)
     - Confidence Intervals (95% CI)
     - P-values
     - Sample sizes (n)
@@ -69,20 +69,20 @@ with col2:
 
             with st.spinner("Finding statistics..."):
                 # Extract statistics from each page
-                odds_ratios = []
+                effect_measures = []
                 confidence_intervals = []
                 p_values = []
                 sample_sizes = []
 
                 for page_num, page_text in pages:
-                    odds_ratios.extend(find_odds_ratios(page_text, page=page_num))
+                    effect_measures.extend(find_effect_measures(page_text, page=page_num))
                     confidence_intervals.extend(find_confidence_intervals(page_text, page=page_num))
                     p_values.extend(find_p_values(page_text, page=page_num))
                     sample_sizes.extend(find_sample_sizes(page_text, page=page_num))
 
                 # Store results
                 st.session_state.paper_results = {
-                    "odds_ratios": odds_ratios,
+                    "effect_measures": effect_measures,
                     "confidence_intervals": confidence_intervals,
                     "p_values": p_values,
                     "sample_sizes": sample_sizes,
@@ -96,28 +96,29 @@ with col2:
     if "paper_results" in st.session_state:
         results = st.session_state.paper_results
 
-        # Odds Ratios Tab
+        # Effect Measures Tab
         tab1, tab2, tab3, tab4 = st.tabs(
-            ["Odds Ratios", "Confidence Intervals", "P-values", "Sample Sizes"]
+            ["Effect Measures", "Confidence Intervals", "P-values", "Sample Sizes"]
         )
 
         with tab1:
-            if results["odds_ratios"]:
-                or_data = []
-                for item in results["odds_ratios"]:
-                    or_data.append(
+            if results["effect_measures"]:
+                em_data = []
+                for item in results["effect_measures"]:
+                    em_data.append(
                         {
+                            "Type": item["type"],
                             "Page": item["page"],
-                            "OR Value": item["value"],
+                            "Value": item["value"],
                             "CI Lower": item["ci_lower"] or "-",
                             "CI Upper": item["ci_upper"] or "-",
                             "Context": item["context"][:80] + "...",
                         }
                     )
-                st.dataframe(pd.DataFrame(or_data), width="stretch")
-                st.caption(f"Found {len(results['odds_ratios'])} odds ratio(s)")
+                st.dataframe(pd.DataFrame(em_data), width="stretch")
+                st.caption(f"Found {len(results['effect_measures'])} effect measure(s)")
             else:
-                st.info("No odds ratios found in this document.")
+                st.info("No effect measures found in this document.")
 
         with tab2:
             if results["confidence_intervals"]:
@@ -178,10 +179,10 @@ with col2:
             # Create combined export data
             export_rows = []
 
-            for item in results["odds_ratios"]:
+            for item in results["effect_measures"]:
                 export_rows.append(
                     {
-                        "Type": "Odds Ratio",
+                        "Type": item["type"],
                         "Page": item["page"],
                         "Value": item["value"],
                         "CI Lower": item["ci_lower"],
@@ -252,7 +253,9 @@ st.markdown("""
 4. **Export**: Download extracted statistics as CSV
 
 **Patterns detected:**
-- `OR = 2.5 (95% CI: 1.2-3.8)` → Odds ratio with confidence interval
+- `OR = 2.5 (95% CI: 1.2-3.8)` → Odds ratio
+- `HR = 1.45 (1.12-1.89)` → Hazard ratio
+- `RR = 0.85` → Relative risk
 - `p < 0.001` or `p = 0.03` → P-values
 - `n = 500` or `500 participants` → Sample sizes
 

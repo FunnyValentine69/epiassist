@@ -69,3 +69,9 @@ dmypy.json
 # Secrets (never commit)
 secrets.toml
 .env.local
+
+# Test papers (PDFs are too large for git)
+test_papers/*.pdf
+test_papers/extracted_text/
+test_papers/extraction_report.csv
+test_papers/missed_patterns.txt
