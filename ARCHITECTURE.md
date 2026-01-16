@@ -121,7 +121,8 @@ def suggest_adjustment_set(dag: nx.DiGraph, exposure: str, outcome: str) -> list
 ```python
 def extract_text_from_pdf(file_bytes: bytes) -> list[tuple[int, str]]
 def find_effect_measures(text: str, page: int = 1) -> list[dict]
-    # Returns dicts with: type (OR|HR|RR|PR|IRR|β), value, ci_lower, ci_upper, context, page
+    # Returns dicts with: type (OR|HR|RR|PR|IRR|β), value, ci_lower, ci_upper,
+    #                     adjusted (True|False|None), adjusted_for (str|None), context, page
 def find_confidence_intervals(text: str, page: int = 1) -> list[dict]
 def find_p_values(text: str, page: int = 1) -> list[dict]
 def find_sample_sizes(text: str, page: int = 1) -> list[dict]
@@ -131,6 +132,8 @@ def find_mean_differences(text: str, page: int = 1) -> list[dict]
     # Returns dicts with: value, ci_lower, ci_upper, context, page
 def find_standard_deviations(text: str, page: int = 1) -> list[dict]
     # Returns dicts with: mean, value, type (SD|SE), context, page
+def find_weighted_statistics(text: str, page: int = 1) -> list[dict]
+    # Returns dicts with: stat_type, value, weight_method (str|None), context, page
 ```
 
 #### power_calculator.py
@@ -309,10 +312,11 @@ python scripts/diagnose_extraction.py ./my_papers  # Custom folder
 - `extraction_summary.txt` - Totals and pattern legend
 
 **Pattern Tracking:**
-- Tracks individual pattern matches (50 patterns total)
-- Effect Measures: 20 patterns (OR: 6, HR: 3, RR: 3, PR: 3, IRR: 3, Beta: 2)
+- Tracks individual pattern matches (55 patterns total)
+- Effect Measures: 20 patterns (OR: 6, HR: 3, RR: 3, PR: 3, IRR: 3, Beta: 2) + adjusted/crude detection
 - CI: 8 patterns, P-value: 2 patterns, Sample: 4 patterns
 - Beta Coefficients: 6 patterns, Mean Differences: 4 patterns, SD/SE: 6 patterns
+- Weighted Statistics: 5 patterns (prevalence, mean, IPW, PS-weighted, weighted OR/HR/RR)
 - Note: Per-pattern counts may exceed totals due to deduplication
 
 ## Error Handling Strategy

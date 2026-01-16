@@ -1,5 +1,17 @@
 # EpiAssist TODO
 
+## Monetization Roadmap
+- [ ] GitHub repo set to PRIVATE
+- [ ] MIT license removed, proprietary copyright added
+- [ ] Create public demo repo (Polyform Noncommercial license, basic extraction only)
+- [ ] Add authentication (Streamlit Auth)
+- [ ] Usage limits (free tier: 3 papers/month)
+- [ ] Stripe integration
+- [ ] Gumroad product page
+- [ ] Landing page with demo video
+- [ ] Beta testers (3-5 MPH students)
+- [ ] Launch: r/epidemiology, r/publichealth, ProductHunt
+
 ## Completed
 
 - [x] **Sprint 1: Project Skeleton**
@@ -58,3 +70,27 @@
 - [ ] Propensity score calculator
 - [ ] Mediation analysis module
 - [ ] Export analysis sessions to PDF report
+
+## Phase 2: Data Analysis Module (Planned)
+- [ ] Data upload interface (CSV, Excel, paste)
+- [ ] Variable selector (outcome, exposure, confounders, weights)
+- [ ] Data preview and validation
+
+## Phase 2.1: Basic Calculators (Planned)
+- [ ] Mantel-Haenszel adjusted OR/RR
+- [ ] E-value calculator (unmeasured confounding)
+- [ ] SMR/SIR calculator (standardized ratios)
+- [ ] Direct/indirect standardization
+
+## Phase 2.2: Regression Analysis (Planned)
+- [ ] Logistic regression → adjusted ORs
+- [ ] Linear regression → adjusted βs
+- [ ] Poisson regression → adjusted IRRs
+
+## Phase 2.3: Survey-Weighted Analysis (Planned)
+- [ ] Weighted means/proportions
+- [ ] Weighted regression with user-provided weight column
+
+## Phase 3: Integration (Future)
+- [ ] DAG → auto-suggest confounders for regression
+- [ ] Paper extraction → compare to DAG recommendations

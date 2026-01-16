@@ -29,6 +29,7 @@ from core.paper_parser import (
     find_beta_coefficients,
     find_mean_differences,
     find_standard_deviations,
+    find_weighted_statistics,
 )
 
 
@@ -152,6 +153,7 @@ def process_pdf(pdf_path: Path, output_dir: Path) -> dict:
     beta_results = []
     md_results = []
     sd_results = []
+    ws_results = []
 
     for page_num, page_text in pages:
         normalized = _normalize_text(page_text)
@@ -162,6 +164,12 @@ def process_pdf(pdf_path: Path, output_dir: Path) -> dict:
         beta_results.extend(find_beta_coefficients(normalized, page_num))
         md_results.extend(find_mean_differences(normalized, page_num))
         sd_results.extend(find_standard_deviations(normalized, page_num))
+        ws_results.extend(find_weighted_statistics(normalized, page_num))
+
+    # Count adjusted vs crude vs unknown for effect measures
+    em_adj = sum(1 for em in em_results if em.get("adjusted") is True)
+    em_crude = sum(1 for em in em_results if em.get("adjusted") is False)
+    em_unk = len(em_results) - em_adj - em_crude
 
     # Count per-pattern matches (on combined text)
     em_pattern_counts = count_pattern_matches(all_text, EFFECT_PATTERNS)
@@ -173,6 +181,9 @@ def process_pdf(pdf_path: Path, output_dir: Path) -> dict:
         "filename": pdf_path.name,
         "pages": len(pages),
         "em_total": len(em_results),
+        "em_adj": em_adj,
+        "em_crude": em_crude,
+        "em_unk": em_unk,
         "em_patterns": em_pattern_counts,
         "ci_total": len(ci_results),
         "ci_patterns": ci_pattern_counts,
@@ -183,6 +194,7 @@ def process_pdf(pdf_path: Path, output_dir: Path) -> dict:
         "beta_total": len(beta_results),
         "md_total": len(md_results),
         "sd_total": len(sd_results),
+        "ws_total": len(ws_results),
     }
 
 
@@ -340,25 +352,37 @@ Examples:
     # Process PDFs
     print(f"Processing {len(pdfs)} PDFs...")
     results = []
-    totals = {"em": 0, "ci": 0, "pval": 0, "sample": 0, "beta": 0, "md": 0, "sd": 0}
+    totals = {
+        "em": 0, "em_adj": 0, "em_crude": 0, "em_unk": 0,
+        "ci": 0, "pval": 0, "sample": 0, "beta": 0, "md": 0, "sd": 0, "ws": 0
+    }
 
     for pdf_path in sorted(pdfs):
         result = process_pdf(pdf_path, extracted_dir)
         if result:
             results.append(result)
             totals["em"] += result["em_total"]
+            totals["em_adj"] += result.get("em_adj", 0)
+            totals["em_crude"] += result.get("em_crude", 0)
+            totals["em_unk"] += result.get("em_unk", 0)
             totals["ci"] += result["ci_total"]
             totals["pval"] += result["pval_total"]
             totals["sample"] += result["sample_total"]
             totals["beta"] += result.get("beta_total", 0)
             totals["md"] += result.get("md_total", 0)
             totals["sd"] += result.get("sd_total", 0)
+            totals["ws"] += result.get("ws_total", 0)
+
+            # Format adjusted breakdown for display
+            em_str = f"{result['em_total']} EM"
+            if result["em_total"] > 0:
+                em_str += f" ({result.get('em_adj', 0)}a/{result.get('em_crude', 0)}c/{result.get('em_unk', 0)}u)"
 
             print(f"  {pdf_path.name}: {result['pages']} pages, "
-                  f"{result['em_total']} EM, {result.get('beta_total', 0)} β, "
+                  f"{em_str}, {result.get('beta_total', 0)} β, "
                   f"{result['ci_total']} CI, {result['pval_total']} p, "
                   f"{result.get('md_total', 0)} MD, {result.get('sd_total', 0)} SD, "
-                  f"{result['sample_total']} n")
+                  f"{result.get('ws_total', 0)} WS, {result['sample_total']} n")
 
     if not results:
         print("No PDFs were successfully processed.")
@@ -374,8 +398,9 @@ Examples:
     # Print summary
     print("")
     print("Summary:")
-    print(f"  Effect Measures: {totals['em']}, Beta: {totals['beta']}, CIs: {totals['ci']}")
-    print(f"  P-values: {totals['pval']}, Mean Diff: {totals['md']}, SD/SE: {totals['sd']}")
+    print(f"  Effect Measures: {totals['em']} ({totals['em_adj']} adj, {totals['em_crude']} crude, {totals['em_unk']} unk)")
+    print(f"  Beta: {totals['beta']}, CIs: {totals['ci']}, P-values: {totals['pval']}")
+    print(f"  Mean Diff: {totals['md']}, SD/SE: {totals['sd']}, Weighted Stats: {totals['ws']}")
     print(f"  Sample Sizes: {totals['sample']}")
     print("")
     print("Reports saved:")

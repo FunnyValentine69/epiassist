@@ -12,6 +12,7 @@ from core.paper_parser import (
     find_beta_coefficients,
     find_mean_differences,
     find_standard_deviations,
+    find_weighted_statistics,
 )
 
 st.set_page_config(page_title="Paper Analyzer - EpiAssist", layout="wide")
@@ -44,12 +45,13 @@ with col1:
 
     st.markdown("### What We Extract")
     st.markdown("""
-    - Effect Measures (OR, HR, RR, PR, IRR)
+    - Effect Measures (OR, HR, RR, PR, IRR) with **adjusted/crude detection**
     - Beta Coefficients (β, B, coefficient)
     - Confidence Intervals (95% CI)
     - P-values
     - Mean Differences (MD)
     - Standard Deviations/Errors (SD, SE)
+    - Weighted Statistics (IPW, survey-weighted, PS-weighted)
     - Sample sizes (n)
     """)
 
@@ -82,6 +84,7 @@ with col2:
                 beta_coefficients = []
                 mean_differences = []
                 standard_deviations = []
+                weighted_statistics = []
 
                 for page_num, page_text in pages:
                     effect_measures.extend(find_effect_measures(page_text, page=page_num))
@@ -91,6 +94,7 @@ with col2:
                     beta_coefficients.extend(find_beta_coefficients(page_text, page=page_num))
                     mean_differences.extend(find_mean_differences(page_text, page=page_num))
                     standard_deviations.extend(find_standard_deviations(page_text, page=page_num))
+                    weighted_statistics.extend(find_weighted_statistics(page_text, page=page_num))
 
                 # Store results
                 st.session_state.paper_results = {
@@ -101,6 +105,7 @@ with col2:
                     "beta_coefficients": beta_coefficients,
                     "mean_differences": mean_differences,
                     "standard_deviations": standard_deviations,
+                    "weighted_statistics": weighted_statistics,
                 }
 
             st.success("Extraction complete.")
@@ -112,14 +117,29 @@ with col2:
         results = st.session_state.paper_results
 
         # Tabs for each extraction type
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
-            ["Effect Measures", "Beta Coefficients", "CIs", "P-values", "Mean Diff", "SD/SE", "Sample Sizes"]
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
+            ["Effect Measures", "Beta Coefficients", "CIs", "P-values", "Mean Diff", "SD/SE", "Weighted Stats", "Sample Sizes"]
         )
 
         with tab1:
             if results["effect_measures"]:
                 em_data = []
                 for item in results["effect_measures"]:
+                    # Format Adjusted? column
+                    if item.get("adjusted") is True:
+                        adjusted_str = "Yes"
+                    elif item.get("adjusted") is False:
+                        adjusted_str = "No"
+                    else:
+                        adjusted_str = "-"
+
+                    # Format Adjusted For column (truncate if long)
+                    adj_for = item.get("adjusted_for")
+                    if adj_for:
+                        adj_for_str = adj_for[:50] + "..." if len(adj_for) > 50 else adj_for
+                    else:
+                        adj_for_str = "-"
+
                     em_data.append(
                         {
                             "Type": item["type"],
@@ -127,11 +147,17 @@ with col2:
                             "Value": item["value"],
                             "CI Lower": item["ci_lower"] or "-",
                             "CI Upper": item["ci_upper"] or "-",
-                            "Context": item["context"][:80] + "...",
+                            "Adjusted?": adjusted_str,
+                            "Adjusted For": adj_for_str,
+                            "Context": item["context"][:60] + "...",
                         }
                     )
                 st.dataframe(pd.DataFrame(em_data), use_container_width=True)
-                st.caption(f"Found {len(results['effect_measures'])} effect measure(s)")
+                # Count adjusted vs crude vs unknown
+                adj_count = sum(1 for em in results["effect_measures"] if em.get("adjusted") is True)
+                crude_count = sum(1 for em in results["effect_measures"] if em.get("adjusted") is False)
+                unk_count = len(results["effect_measures"]) - adj_count - crude_count
+                st.caption(f"Found {len(results['effect_measures'])} effect measure(s): {adj_count} adjusted, {crude_count} crude, {unk_count} unknown")
             else:
                 st.info("No effect measures found in this document.")
 
@@ -229,6 +255,24 @@ with col2:
                 st.info("No standard deviations/errors found in this document.")
 
         with tab7:
+            if results.get("weighted_statistics"):
+                ws_data = []
+                for item in results["weighted_statistics"]:
+                    ws_data.append(
+                        {
+                            "Page": item["page"],
+                            "Type": item["stat_type"],
+                            "Value": item["value"],
+                            "Weight Method": item["weight_method"] or "-",
+                            "Context": item["context"][:60] + "...",
+                        }
+                    )
+                st.dataframe(pd.DataFrame(ws_data), use_container_width=True)
+                st.caption(f"Found {len(results['weighted_statistics'])} weighted statistic(s)")
+            else:
+                st.info("No weighted statistics found in this document.")
+
+        with tab8:
             if results["sample_sizes"]:
                 n_data = []
                 for item in results["sample_sizes"]:
@@ -257,6 +301,8 @@ with col2:
                         "Value": item["value"],
                         "CI Lower": item["ci_lower"],
                         "CI Upper": item["ci_upper"],
+                        "Adjusted": item.get("adjusted"),
+                        "Adjusted For": item.get("adjusted_for"),
                         "Context": item["context"],
                     }
                 )
@@ -308,6 +354,17 @@ with col2:
                     }
                 )
 
+            for item in results.get("weighted_statistics", []):
+                export_rows.append(
+                    {
+                        "Type": f"Weighted {item['stat_type']}",
+                        "Page": item["page"],
+                        "Value": item["value"],
+                        "Weight Method": item["weight_method"],
+                        "Context": item["context"],
+                    }
+                )
+
             for item in results["sample_sizes"]:
                 export_rows.append(
                     {
@@ -355,16 +412,19 @@ st.markdown("### How It Works")
 st.markdown("""
 1. **Text Extraction**: We use PyMuPDF to extract text from your PDF
 2. **Pattern Matching**: Regular expressions identify statistical measures
-3. **Structured Output**: Results are organized in tabs for easy review
-4. **Export**: Download extracted statistics as CSV
+3. **Adjustment Detection**: Identifies adjusted vs crude effect measures
+4. **Structured Output**: Results are organized in tabs for easy review
+5. **Export**: Download extracted statistics as CSV
 
 **Patterns detected:**
-- `OR = 2.5 (95% CI: 1.2-3.8)` → Odds ratio
+- `aOR = 2.5 (95% CI: 1.2-3.8)` → Adjusted odds ratio
+- `adjusted for age, sex, education` → Adjustment variables
 - `HR = 1.45 (1.12-1.89)` → Hazard ratio
 - `RR = 0.85` → Relative risk
 - `β = 0.45; 95% CI: 0.12-0.78` → Beta coefficient
 - `mean difference: 2.5` → Mean difference
 - `3.17 (SD 1.19)` or `3.17 ± 1.19` → Standard deviation
+- `weighted prevalence: 25.3%` → Weighted statistic
 - `p < 0.001` or `p = 0.03` → P-values
 - `n = 500` or `500 participants` → Sample sizes
 

@@ -31,6 +31,68 @@ def _normalize_text(text: str) -> str:
     return text
 
 
+def _detect_adjustment_status(
+    text: str, match_start: int, match_end: int
+) -> tuple[bool | None, str | None]:
+    """Detect if an effect measure is adjusted and extract adjustment variables.
+
+    Args:
+        text: Full normalized text.
+        match_start: Start position of the effect measure match.
+        match_end: End position of the effect measure match.
+
+    Returns:
+        Tuple of (is_adjusted, adjusted_for_text).
+        is_adjusted: True if adjusted, False if crude/unadjusted, None if unknown.
+        adjusted_for_text: Extracted adjustment variables or None.
+    """
+    # Expand context window for adjustment detection (±150 chars)
+    context_start = max(0, match_start - 150)
+    context_end = min(len(text), match_end + 150)
+    context = text[context_start:context_end].lower()
+
+    # Position of match within context
+    match_pos_in_context = match_start - context_start
+
+    is_adjusted = None
+    adjusted_for = None
+
+    # Check for adjusted indicators BEFORE the match (within 50 chars)
+    prefix_start = max(0, match_pos_in_context - 50)
+    prefix = context[prefix_start:match_pos_in_context]
+
+    # Adjusted indicators in prefix
+    if re.search(r"\b(adjusted|aor|ahr|arr|apr|airr)\b", prefix):
+        is_adjusted = True
+    # Crude/unadjusted indicators in prefix
+    elif re.search(r"\b(crude|unadjusted)\b", prefix):
+        is_adjusted = False
+
+    # Also check for adjustment phrases in wider context
+    if is_adjusted is None:
+        if re.search(r"after\s+adjust", context):
+            is_adjusted = True
+        elif re.search(r"after\s+controll", context):
+            is_adjusted = True
+        elif re.search(r"before\s+adjust", context):
+            is_adjusted = False
+        elif re.search(r"unadjusted\s+model", context):
+            is_adjusted = False
+
+    # Extract adjustment variables if present
+    adj_match = re.search(
+        r"adjust(?:ed|ing)\s+for\s+([^.;)]+?)(?:\.|;|\)|$)", context
+    )
+    if adj_match:
+        adjusted_for = adj_match.group(1).strip()
+        # Clean up: remove leading/trailing punctuation and whitespace
+        adjusted_for = re.sub(r"^[,\s]+|[,\s]+$", "", adjusted_for)
+        if adjusted_for:
+            is_adjusted = True  # If we found adjustment variables, it's adjusted
+
+    return is_adjusted, adjusted_for
+
+
 def extract_text_from_pdf(file_bytes: bytes) -> list[tuple[int, str]]:
     """Extract text content from a PDF file by page.
 
@@ -145,11 +207,25 @@ def find_effect_measures(text: str, page: int = 1) -> list[dict]:
                     ci_lower = None
                     ci_upper = None
 
+                # Detect adjustment status
+                is_adjusted, adjusted_for = _detect_adjustment_status(
+                    normalized, match.start(), match.end()
+                )
+
+                # Also check if pattern itself indicates adjusted (aOR, aHR, etc.)
+                pattern_lower = pattern.lower()
+                if "aor" in pattern_lower or "ahr" in pattern_lower or "arr" in pattern_lower:
+                    is_adjusted = True
+                elif "adjusted" in pattern_lower:
+                    is_adjusted = True
+
                 result = {
                     "type": measure_type,
                     "value": value,
                     "ci_lower": ci_lower,
                     "ci_upper": ci_upper,
+                    "adjusted": is_adjusted,
+                    "adjusted_for": adjusted_for,
                     "context": normalized[max(0, match.start() - 50) : match.end() + 50],
                     "page": page,
                 }
@@ -544,6 +620,72 @@ def find_standard_deviations(text: str, page: int = 1) -> list[dict]:
                 r["value"] == result["value"]
                 and r["mean"] == result["mean"]
                 and r["type"] == result["type"]
+                and r["page"] == result["page"]
+                for r in results
+            ):
+                results.append(result)
+
+    return results
+
+
+def find_weighted_statistics(text: str, page: int = 1) -> list[dict]:
+    """Find weighted statistics mentioned in text.
+
+    Args:
+        text: Text to search.
+        page: Page number where this text was found.
+
+    Returns:
+        List of dicts with 'stat_type', 'value', 'weight_method', 'context', 'page'.
+    """
+    results = []
+    normalized = _normalize_text(text)
+
+    # Patterns for weighted statistics
+    # Each tuple: (pattern, stat_type)
+    patterns = [
+        # weighted prevalence: 25.3% or weighted prevalence = 25.3%
+        (r"weighted\s+prevalence[:\s=]+(\d+(?:\.\d+)?)\s*%?", "prevalence"),
+        # survey-weighted mean: 3.5 or survey-weighted mean = 3.5
+        (r"(?:survey[- ])?weighted\s+mean[:\s=]+(\d+(?:\.\d+)?)", "mean"),
+        # IPW estimate: 1.45 or IPTW: 1.45 or IPW = 1.45
+        (r"(?:IPW|IPTW)\s*(?:estimate)?[:\s=]+(\d+(?:\.\d+)?)", "IPW"),
+        # PS-weighted OR: 2.1 or propensity-weighted OR = 2.1
+        (r"(?:PS|propensity)[- ]?weighted\s+(?:OR|HR|RR)[:\s=]+(\d+(?:\.\d+)?)", "PS-weighted"),
+        # weighted OR: 2.1 or weighted HR = 1.5
+        (r"weighted\s+(?:OR|HR|RR)[:\s=]+(\d+(?:\.\d+)?)", "weighted"),
+    ]
+
+    for pattern, stat_type in patterns:
+        for match in re.finditer(pattern, normalized, re.IGNORECASE):
+            value = float(match.group(1))
+
+            # Detect weight method from context
+            context = normalized[max(0, match.start() - 50) : match.end() + 50]
+            context_lower = context.lower()
+
+            weight_method = None
+            if "ipw" in context_lower or "iptw" in context_lower:
+                weight_method = "IPW"
+            elif "propensity" in context_lower or "ps-weight" in context_lower:
+                weight_method = "Propensity score"
+            elif "survey" in context_lower:
+                weight_method = "Survey weights"
+            elif "sampling" in context_lower:
+                weight_method = "Sampling weights"
+
+            result = {
+                "stat_type": stat_type,
+                "value": value,
+                "weight_method": weight_method,
+                "context": context,
+                "page": page,
+            }
+
+            # Avoid duplicates on same page
+            if not any(
+                r["stat_type"] == result["stat_type"]
+                and r["value"] == result["value"]
                 and r["page"] == result["page"]
                 for r in results
             ):

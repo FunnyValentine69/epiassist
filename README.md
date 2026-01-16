@@ -11,12 +11,14 @@ An epidemiological research assistant for causal inference, statistical analysis
 - **Hypothesis Framework**: Structure your research questions into formal null and alternative hypotheses. Get study design recommendations and bias checklists.
 
 - **Paper Analyzer**: Upload epidemiological papers (PDF) and automatically extract:
-  - Effect measures (OR, HR, RR, PR, IRR)
+  - Effect measures (OR, HR, RR, PR, IRR) with **adjusted vs crude detection**
+  - Adjustment variables (e.g., "adjusted for age, sex, education")
   - Beta coefficients (β, B, coefficient)
   - Confidence intervals (95% CI)
   - P-values
   - Mean differences (MD)
   - Standard deviations and standard errors (SD, SE)
+  - Weighted statistics (IPW, survey-weighted, PS-weighted)
   - Sample sizes
 
   Includes page citations for each extracted statistic. Handles PDF text quirks (hyphenation, en-dash, Unicode encoding). Validated against published research.
@@ -126,6 +128,6 @@ black .
 mypy core/ utils/
 ```
 
-## License
+---
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Copyright © 2025 Rogue Semicolon. All rights reserved.
