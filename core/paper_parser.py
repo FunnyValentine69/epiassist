@@ -190,21 +190,25 @@ def find_confidence_intervals(text: str, page: int = 1) -> list[dict]:
     normalized = _normalize_text(text)
 
     # Comprehensive CI patterns
-    # Number pattern: \d+(?:\.\d+)? matches "2" or "2.5" but not "2."
-    # Note: \s*%?\s* handles "95%", "95 %", "95 % ", and "95" (no percent)
+    # Supports: dash, comma, and "to" separators; negative numbers; brackets
+    # Number pattern: -?\d+(?:\.\d+)? matches "-2", "2", "2.5", "-0.32"
     patterns = [
-        # 95% CI: 1.2-3.8 or 95% CI 1.2-3.8 or 95% CI (1.2-3.8)
-        r"(\d+)\s*%?\s*ci[:\s]*\(?(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\)?",
-        # 95% confidence interval, 1.4 to 3.4
-        r"(\d+)\s*%?\s*confidence\s+interval[,:\s]+(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)",
+        # 95% CI: 1.2-3.8 or 95% CI: 1.2, 3.8 (comma or dash separator)
+        r"(\d+)\s*%?\s*ci[:\s]*\(?(-?\d+(?:\.\d+)?)\s*(?:[-,]|to)\s*(-?\d+(?:\.\d+)?)\)?",
+        # 95% CI = 1.2-3.8 or 95% CI = 1.2, 3.8 (equals sign)
+        r"(\d+)\s*%?\s*ci\s*=\s*\(?(-?\d+(?:\.\d+)?)\s*(?:[-,]|to)\s*(-?\d+(?:\.\d+)?)\)?",
+        # 95% confidence interval, 1.4 to 3.4 or 1.4, 3.4
+        r"(\d+)\s*%?\s*confidence\s+interval[,:\s]+(-?\d+(?:\.\d+)?)\s*(?:[-,]|to)\s*(-?\d+(?:\.\d+)?)",
         # confidence interval, 1.4 to 3.4 (no percentage)
-        r"confidence\s+interval[,:\s]+(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)",
+        r"confidence\s+interval[,:\s]+(-?\d+(?:\.\d+)?)\s*(?:[-,]|to)\s*(-?\d+(?:\.\d+)?)",
         # confidence interval of 1.4 to 3.4
-        r"confidence\s+interval\s+of\s+(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)",
-        # CI: 1.2 to 3.8 or CI = 1.2-3.8 or CI 1.2-3.8
-        r"\bci[:\s=]+(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)",
-        # (1.2-3.8) ONLY when preceded by CI or confidence interval
-        r"(?:ci|confidence\s+interval)[,:\s]*\((\d+(?:\.\d+)?)\s*(?:[-,]|to)\s*(\d+(?:\.\d+)?)\)",
+        r"confidence\s+interval\s+of\s+(-?\d+(?:\.\d+)?)\s*(?:[-,]|to)\s*(-?\d+(?:\.\d+)?)",
+        # CI: 1.2 to 3.8 or CI = 1.2-3.8 or CI 1.2, 3.4
+        r"\bci[:\s=]+(-?\d+(?:\.\d+)?)\s*(?:[-,]|to)\s*(-?\d+(?:\.\d+)?)",
+        # (1.2-3.8) or (1.2, 3.4) when preceded by CI
+        r"(?:ci|confidence\s+interval)[,:\s]*\((-?\d+(?:\.\d+)?)\s*(?:[-,]|to)\s*(-?\d+(?:\.\d+)?)\)",
+        # Bracket notation: [1.2, 3.4] or [1.2-3.4] when preceded by CI
+        r"(?:ci|confidence\s+interval)[,:\s]*\[(-?\d+(?:\.\d+)?)\s*(?:[-,;]|to)\s*(-?\d+(?:\.\d+)?)\]",
     ]
 
     for pattern in patterns:
@@ -222,10 +226,10 @@ def find_confidence_intervals(text: str, page: int = 1) -> list[dict]:
                 upper = float(groups[1])
 
             # Validate CI values
-            if lower > 100 or upper > 100:
+            if abs(lower) > 100 or abs(upper) > 100:
                 continue  # Skip year-like ranges
             if lower >= upper:
-                continue  # Skip invalid CI
+                continue  # Skip invalid CI (lower should be less than upper)
 
             result = {
                 "level": level,
