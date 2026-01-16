@@ -26,6 +26,9 @@ from core.paper_parser import (
     find_confidence_intervals,
     find_p_values,
     find_sample_sizes,
+    find_beta_coefficients,
+    find_mean_differences,
+    find_standard_deviations,
 )
 
 
@@ -146,6 +149,9 @@ def process_pdf(pdf_path: Path, output_dir: Path) -> dict:
     ci_results = []
     pval_results = []
     sample_results = []
+    beta_results = []
+    md_results = []
+    sd_results = []
 
     for page_num, page_text in pages:
         normalized = _normalize_text(page_text)
@@ -153,6 +159,9 @@ def process_pdf(pdf_path: Path, output_dir: Path) -> dict:
         ci_results.extend(find_confidence_intervals(normalized, page_num))
         pval_results.extend(find_p_values(normalized, page_num))
         sample_results.extend(find_sample_sizes(normalized, page_num))
+        beta_results.extend(find_beta_coefficients(normalized, page_num))
+        md_results.extend(find_mean_differences(normalized, page_num))
+        sd_results.extend(find_standard_deviations(normalized, page_num))
 
     # Count per-pattern matches (on combined text)
     em_pattern_counts = count_pattern_matches(all_text, EFFECT_PATTERNS)
@@ -171,6 +180,9 @@ def process_pdf(pdf_path: Path, output_dir: Path) -> dict:
         "pval_patterns": pval_pattern_counts,
         "sample_total": len(sample_results),
         "sample_patterns": sample_pattern_counts,
+        "beta_total": len(beta_results),
+        "md_total": len(md_results),
+        "sd_total": len(sd_results),
     }
 
 
@@ -232,7 +244,7 @@ def write_summary_report(results: list[dict], output_path: Path) -> None:
     lines = [
         "=" * 70,
         "EXTRACTION SUMMARY REPORT",
-        "Effect measures now include: OR, HR, RR, PR, IRR, Beta",
+        "Effect measures: OR, HR, RR, PR, IRR | Also: Beta, MD, SD/SE",
         "=" * 70,
         "",
     ]
@@ -242,11 +254,17 @@ def write_summary_report(results: list[dict], output_path: Path) -> None:
     total_ci = sum(r["ci_total"] for r in results)
     total_pval = sum(r["pval_total"] for r in results)
     total_sample = sum(r["sample_total"] for r in results)
+    total_beta = sum(r.get("beta_total", 0) for r in results)
+    total_md = sum(r.get("md_total", 0) for r in results)
+    total_sd = sum(r.get("sd_total", 0) for r in results)
 
     lines.append("TOTALS ACROSS ALL FILES:")
     lines.append(f"  Effect Measures: {total_em}")
+    lines.append(f"  Beta Coefficients: {total_beta}")
     lines.append(f"  Confidence Intervals: {total_ci}")
     lines.append(f"  P-values: {total_pval}")
+    lines.append(f"  Mean Differences: {total_md}")
+    lines.append(f"  SD/SE: {total_sd}")
     lines.append(f"  Sample Sizes: {total_sample}")
     lines.append("")
 
@@ -259,8 +277,11 @@ def write_summary_report(results: list[dict], output_path: Path) -> None:
         lines.append(f"File: {r['filename']}")
         lines.append(f"  Pages: {r['pages']}")
         lines.append(f"  Effect Measures: {r['em_total']}")
+        lines.append(f"  Beta Coefficients: {r.get('beta_total', 0)}")
         lines.append(f"  Confidence Intervals: {r['ci_total']}")
         lines.append(f"  P-values: {r['pval_total']}")
+        lines.append(f"  Mean Differences: {r.get('md_total', 0)}")
+        lines.append(f"  SD/SE: {r.get('sd_total', 0)}")
         lines.append(f"  Sample Sizes: {r['sample_total']}")
         lines.append("")
 
@@ -319,7 +340,7 @@ Examples:
     # Process PDFs
     print(f"Processing {len(pdfs)} PDFs...")
     results = []
-    totals = {"em": 0, "ci": 0, "pval": 0, "sample": 0}
+    totals = {"em": 0, "ci": 0, "pval": 0, "sample": 0, "beta": 0, "md": 0, "sd": 0}
 
     for pdf_path in sorted(pdfs):
         result = process_pdf(pdf_path, extracted_dir)
@@ -329,10 +350,15 @@ Examples:
             totals["ci"] += result["ci_total"]
             totals["pval"] += result["pval_total"]
             totals["sample"] += result["sample_total"]
+            totals["beta"] += result.get("beta_total", 0)
+            totals["md"] += result.get("md_total", 0)
+            totals["sd"] += result.get("sd_total", 0)
 
             print(f"  {pdf_path.name}: {result['pages']} pages, "
-                  f"{result['em_total']} effect measures, {result['ci_total']} CIs, "
-                  f"{result['pval_total']} p-values, {result['sample_total']} samples")
+                  f"{result['em_total']} EM, {result.get('beta_total', 0)} β, "
+                  f"{result['ci_total']} CI, {result['pval_total']} p, "
+                  f"{result.get('md_total', 0)} MD, {result.get('sd_total', 0)} SD, "
+                  f"{result['sample_total']} n")
 
     if not results:
         print("No PDFs were successfully processed.")
@@ -348,8 +374,9 @@ Examples:
     # Print summary
     print("")
     print("Summary:")
-    print(f"  Total: {totals['em']} effect measures, {totals['ci']} CIs, "
-          f"{totals['pval']} p-values, {totals['sample']} samples")
+    print(f"  Effect Measures: {totals['em']}, Beta: {totals['beta']}, CIs: {totals['ci']}")
+    print(f"  P-values: {totals['pval']}, Mean Diff: {totals['md']}, SD/SE: {totals['sd']}")
+    print(f"  Sample Sizes: {totals['sample']}")
     print("")
     print("Reports saved:")
     print(f"  {csv_path}")

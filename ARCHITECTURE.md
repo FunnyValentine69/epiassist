@@ -125,6 +125,12 @@ def find_effect_measures(text: str, page: int = 1) -> list[dict]
 def find_confidence_intervals(text: str, page: int = 1) -> list[dict]
 def find_p_values(text: str, page: int = 1) -> list[dict]
 def find_sample_sizes(text: str, page: int = 1) -> list[dict]
+def find_beta_coefficients(text: str, page: int = 1) -> list[dict]
+    # Returns dicts with: value, ci_lower, ci_upper, se, context, page
+def find_mean_differences(text: str, page: int = 1) -> list[dict]
+    # Returns dicts with: value, ci_lower, ci_upper, context, page
+def find_standard_deviations(text: str, page: int = 1) -> list[dict]
+    # Returns dicts with: mean, value, type (SD|SE), context, page
 ```
 
 #### power_calculator.py
@@ -226,11 +232,11 @@ NODE_COLORS = {
 │             │    │  Extract    │    │  Patterns   │    │   Stats     │
 └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
                                                                │
-                         ┌─────────────────────────────────────┤
-                         ▼                   ▼                 ▼
-                   ┌──────────┐       ┌──────────┐      ┌──────────┐
-                   │ ORs/RRs  │       │   CIs    │      │ P-values │
-                   └──────────┘       └──────────┘      └──────────┘
+         ┌─────────────────────────────────────────────────────┤
+         ▼           ▼           ▼           ▼           ▼     ▼
+   ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+   │ OR/HR/RR │ │  Beta    │ │   CIs    │ │ P-values │ │  SD/SE   │
+   └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
 ```
 
 ### Power Analysis Flow
@@ -303,9 +309,10 @@ python scripts/diagnose_extraction.py ./my_papers  # Custom folder
 - `extraction_summary.txt` - Totals and pattern legend
 
 **Pattern Tracking:**
-- Tracks individual pattern matches (32 patterns total)
+- Tracks individual pattern matches (50 patterns total)
 - Effect Measures: 20 patterns (OR: 6, HR: 3, RR: 3, PR: 3, IRR: 3, Beta: 2)
-- CI: 6 patterns, P-value: 2 patterns, Sample: 4 patterns
+- CI: 8 patterns, P-value: 2 patterns, Sample: 4 patterns
+- Beta Coefficients: 6 patterns, Mean Differences: 4 patterns, SD/SE: 6 patterns
 - Note: Per-pattern counts may exceed totals due to deduplication
 
 ## Error Handling Strategy

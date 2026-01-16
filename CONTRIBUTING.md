@@ -146,9 +146,26 @@ patterns = [
 
 - Use `(?:...)` for non-capturing groups
 - Use `\d+(?:\.\d+)?` for numbers (matches "2" or "2.5")
-- Use `(?:-|to)` for range separators
+- Use `-?\d+(?:\.\d+)?` for numbers that can be negative
+- Use `(?:[-,]|to)` for range separators (dash, comma, or "to")
 - Use `[,:\s=]+` for flexible delimiters
 - Always use `re.IGNORECASE` flag
+
+### Example: Adding Beta Coefficient Pattern
+
+```python
+# Pattern: β = 2.18 (95% CI: 0.30-4.01)
+r"(?:β|beta)\s*[=:]\s*(-?\d+(?:\.\d+)?)\s*\(.*?ci[:\s]*(-?\d+(?:\.\d+)?)\s*(?:[-,]|to)\s*(-?\d+(?:\.\d+)?)\)"
+
+# Breakdown:
+# (?:β|beta)           - Match β or "beta" (non-capturing)
+# \s*[=:]\s*           - Equals or colon with optional whitespace
+# (-?\d+(?:\.\d+)?)    - Capture: optional negative, integer or decimal
+# \s*\(.*?ci[:\s]*     - Opening paren, skip to CI
+# (-?\d+(?:\.\d+)?)    - Capture: CI lower bound
+# \s*(?:[-,]|to)\s*    - Separator: dash, comma, or "to"
+# (-?\d+(?:\.\d+)?)\)  - Capture: CI upper bound, closing paren
+```
 
 ### Testing Patterns
 

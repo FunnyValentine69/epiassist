@@ -342,3 +342,211 @@ def find_sample_sizes(text: str, page: int = 1) -> list[dict]:
 
     # Sort by value descending
     return sorted(results, key=lambda x: x["value"], reverse=True)
+
+
+def find_beta_coefficients(text: str, page: int = 1) -> list[dict]:
+    """Find beta coefficients mentioned in text.
+
+    Args:
+        text: Text to search.
+        page: Page number where this text was found.
+
+    Returns:
+        List of dicts with 'value', 'ci_lower', 'ci_upper', 'se', 'context', 'page'.
+    """
+    results = []
+    normalized = _normalize_text(text)
+
+    # Patterns for beta coefficients
+    # Ordered: most specific (with CI) first, then SE, then standalone
+    patterns = [
+        # β = 2.18 (95% CI: 0.30-4.01) or β: 2.18; 95% CI 0.30, 4.01
+        (
+            r"(?:β|beta)\s*[=:]\s*(-?\d+(?:\.\d+)?)\s*[;,]?\s*\(?(?:(\d+)%?\s*)?ci[:\s]*(-?\d+(?:\.\d+)?)\s*(?:[-,]|to)\s*(-?\d+(?:\.\d+)?)\)?",
+            "ci",
+        ),
+        # coefficient = 0.45 (95% CI: 0.12-0.78)
+        (
+            r"(?:coefficient|coef)\s*[=:]\s*(-?\d+(?:\.\d+)?)\s*[;,]?\s*\(?(?:(\d+)%?\s*)?ci[:\s]*(-?\d+(?:\.\d+)?)\s*(?:[-,]|to)\s*(-?\d+(?:\.\d+)?)\)?",
+            "ci",
+        ),
+        # B = 1.23 (SE = 0.45) - unstandardized beta (requires SE context)
+        (
+            r"\bB\s*[=:]\s*(-?\d+(?:\.\d+)?)\s*\(\s*SE\s*[=:]\s*(\d+(?:\.\d+)?)\s*\)",
+            "se",
+        ),
+        # coefficient B = 1.23 - requires "coefficient" prefix for uppercase B
+        (r"coefficient\s+B\s*[=:]\s*(-?\d+(?:\.\d+)?)", "standalone"),
+        # Standalone β = 2.18 or beta = -0.52
+        (r"(?:β|beta)\s*[=:]\s*(-?\d+(?:\.\d+)?)(?!\s*%)", "standalone"),
+        # Standalone coefficient = 0.45
+        (r"(?:coefficient|coef)\s*[=:]\s*(-?\d+(?:\.\d+)?)(?!\s*%)", "standalone"),
+    ]
+
+    for pattern, pattern_type in patterns:
+        for match in re.finditer(pattern, normalized, re.IGNORECASE):
+            groups = match.groups()
+
+            if pattern_type == "ci":
+                # (value, ci_level?, ci_lower, ci_upper)
+                value = float(groups[0])
+                ci_lower = float(groups[2])
+                ci_upper = float(groups[3])
+                se = None
+            elif pattern_type == "se":
+                # (value, se)
+                value = float(groups[0])
+                se = float(groups[1])
+                ci_lower = None
+                ci_upper = None
+            else:
+                # Standalone (value only)
+                value = float(groups[0])
+                ci_lower = None
+                ci_upper = None
+                se = None
+
+            result = {
+                "value": value,
+                "ci_lower": ci_lower,
+                "ci_upper": ci_upper,
+                "se": se,
+                "context": normalized[max(0, match.start() - 30) : match.end() + 30],
+                "page": page,
+            }
+
+            # Avoid duplicates on same page
+            if not any(
+                r["value"] == result["value"]
+                and r["ci_lower"] == result["ci_lower"]
+                and r["ci_upper"] == result["ci_upper"]
+                and r["page"] == result["page"]
+                for r in results
+            ):
+                results.append(result)
+
+    return results
+
+
+def find_mean_differences(text: str, page: int = 1) -> list[dict]:
+    """Find mean differences mentioned in text.
+
+    Args:
+        text: Text to search.
+        page: Page number where this text was found.
+
+    Returns:
+        List of dicts with 'value', 'ci_lower', 'ci_upper', 'context', 'page'.
+    """
+    results = []
+    normalized = _normalize_text(text)
+
+    # Patterns for mean differences
+    # Ordered: most specific (with CI) first, then standalone
+    patterns = [
+        # mean difference: 2.5 (95% CI: 1.2-3.8) or MD = 2.5; 95% CI 1.2, 3.8
+        r"(?:mean\s+difference|md)\s*[=:]\s*(-?\d+(?:\.\d+)?)\s*[;,]?\s*\(?(?:(\d+)%?\s*)?ci[:\s]*(-?\d+(?:\.\d+)?)\s*(?:[-,]|to)\s*(-?\d+(?:\.\d+)?)\)?",
+        # difference of 3.2 points; 95% CI 2.1-4.3 (requires "points")
+        r"difference\s+of\s+(-?\d+(?:\.\d+)?)\s*points?\s*[;,]?\s*(?:(\d+)%?\s*)?ci[:\s]*(-?\d+(?:\.\d+)?)\s*(?:[-,]|to)\s*(-?\d+(?:\.\d+)?)",
+        # 0.29 points; 95% CI 0.26-0.31 (requires "points" + CI)
+        r"(-?\d+(?:\.\d+)?)\s*points?\s*[;,]\s*(?:(\d+)%?\s*)?ci[:\s]*(-?\d+(?:\.\d+)?)\s*(?:[-,]|to)\s*(-?\d+(?:\.\d+)?)",
+        # Standalone mean difference = 2.5 or MD = 2.5
+        r"(?:mean\s+difference|md)\s*[=:]\s*(-?\d+(?:\.\d+)?)",
+    ]
+
+    for pattern in patterns:
+        for match in re.finditer(pattern, normalized, re.IGNORECASE):
+            groups = match.groups()
+
+            if len(groups) >= 4 and groups[2] is not None:
+                # Pattern with CI
+                value = float(groups[0])
+                ci_lower = float(groups[2])
+                ci_upper = float(groups[3])
+            else:
+                # Standalone pattern
+                value = float(groups[0])
+                ci_lower = None
+                ci_upper = None
+
+            result = {
+                "value": value,
+                "ci_lower": ci_lower,
+                "ci_upper": ci_upper,
+                "context": normalized[max(0, match.start() - 30) : match.end() + 30],
+                "page": page,
+            }
+
+            # Avoid duplicates on same page
+            if not any(
+                r["value"] == result["value"]
+                and r["ci_lower"] == result["ci_lower"]
+                and r["ci_upper"] == result["ci_upper"]
+                and r["page"] == result["page"]
+                for r in results
+            ):
+                results.append(result)
+
+    return results
+
+
+def find_standard_deviations(text: str, page: int = 1) -> list[dict]:
+    """Find standard deviations and standard errors mentioned in text.
+
+    Args:
+        text: Text to search.
+        page: Page number where this text was found.
+
+    Returns:
+        List of dicts with 'mean', 'value', 'type' (SD/SE), 'context', 'page'.
+    """
+    results = []
+    normalized = _normalize_text(text)
+
+    # Patterns for SD/SE
+    # Each tuple: (pattern, type, has_mean)
+    patterns = [
+        # mean 3.17 (SD 1.19) or 3.17 (SD = 1.19)
+        (r"(?:mean\s*[=:]?\s*)?(-?\d+(?:\.\d+)?)\s*\(\s*SD\s*[=:]?\s*(\d+(?:\.\d+)?)\s*\)", "SD", True),
+        # 3.17 ± 1.19 (plus-minus notation)
+        (r"(-?\d+(?:\.\d+)?)\s*[±]\s*(\d+(?:\.\d+)?)", "SD", True),
+        # SD = 2.5 or SD: 2.5 (standalone)
+        (r"\bSD\s*[=:]\s*(\d+(?:\.\d+)?)", "SD", False),
+        # SE = 0.45 or SE: 0.45 (standalone)
+        (r"\bSE\s*[=:]\s*(\d+(?:\.\d+)?)", "SE", False),
+        # standard deviation = 2.5
+        (r"standard\s+deviation\s*[=:]\s*(\d+(?:\.\d+)?)", "SD", False),
+        # standard error = 0.45
+        (r"standard\s+error\s*[=:]\s*(\d+(?:\.\d+)?)", "SE", False),
+    ]
+
+    for pattern, sd_type, has_mean in patterns:
+        for match in re.finditer(pattern, normalized, re.IGNORECASE):
+            groups = match.groups()
+
+            if has_mean and len(groups) >= 2:
+                mean_value = float(groups[0])
+                sd_value = float(groups[1])
+            else:
+                mean_value = None
+                sd_value = float(groups[0])
+
+            result = {
+                "mean": mean_value,
+                "value": sd_value,
+                "type": sd_type,
+                "context": normalized[max(0, match.start() - 30) : match.end() + 30],
+                "page": page,
+            }
+
+            # Avoid duplicates on same page
+            if not any(
+                r["value"] == result["value"]
+                and r["mean"] == result["mean"]
+                and r["type"] == result["type"]
+                and r["page"] == result["page"]
+                for r in results
+            ):
+                results.append(result)
+
+    return results

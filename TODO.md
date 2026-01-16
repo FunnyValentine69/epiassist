@@ -26,29 +26,26 @@
   - Sample size calculator, power curves
   - E-value sensitivity analysis for unmeasured confounding
 
-## In Progress
-
-- [ ] Paper Analyzer pattern debugging
-  - Diagnostic script for testing extraction patterns
-  - Test corpus system for validation
+- [x] **Paper Analyzer Enhancements**
+  - Add HR, RR, PR, IRR extraction (5x improvement over OR-only)
+  - Fix CI extraction: comma/bracket patterns (150% improvement)
+  - Add β coefficient extraction
+  - Add mean difference (MD) extraction
+  - Add SD/SE extraction
+  - Diagnostic scripts for pattern testing
 
 ## Known Limitations
 
 - **Paper Analyzer**
-  - Only extracts Odds Ratios (not Hazard Ratios or Relative Risks)
-  - Some CI formats not captured (bracket notation `[1.2, 3.4]`)
   - Table data extraction not implemented
+  - Figure/chart data not extracted
+  - Some papers use non-standard formats
 
 - **Data Integration**
   - No NHANES data loader yet
   - No PubMed API integration
 
 ## Roadmap
-
-### Near-term
-- [ ] Add Hazard Ratio (HR) extraction to Paper Analyzer
-- [ ] Add Relative Risk (RR) extraction to Paper Analyzer
-- [ ] Improve CI pattern coverage (bracket notation, semicolon format)
 
 ### Medium-term
 - [ ] NHANES data loader
