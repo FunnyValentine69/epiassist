@@ -88,9 +88,9 @@ def calculate_e_value_for_or(
     ci_bound = None
     if ci_lower is not None and ci_upper is not None:
         if odds_ratio >= 1:
-            ci_bound = ci_lower  # For protective, use lower bound
+            ci_bound = ci_lower  # Harmful: lower bound is closer to 1
         else:
-            ci_bound = ci_upper  # For harmful, use upper bound
+            ci_bound = ci_upper  # Protective: upper bound is closer to 1
 
     return calculate_e_value(odds_ratio, ci_bound)
 

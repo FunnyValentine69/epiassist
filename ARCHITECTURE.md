@@ -101,6 +101,7 @@
 - Auto-generated 2x2 cross-tabulation using `build_contingency_table`
 - Reuses `stats_calculator` for OR, RR, RD, Chi-square on derived table
 - Mantel-Haenszel stratified analysis when confounders are assigned (adjusted OR/RR, Breslow-Day test)
+- E-value sensitivity analysis auto-computed from crude OR (and MH-adjusted OR when available)
 
 ### core/ (Business Logic)
 
@@ -373,6 +374,13 @@ META_MEASURE_LABELS = {"OR": "Odds Ratio", ...}
                                                        │ Mantel-Haenszel │
                                                        │ (if confounders │
                                                        │  assigned)      │
+                                                       └────────┬────────┘
+                                                                │
+                                                                ▼
+                                                       ┌─────────────────┐
+                                                       │ E-Value         │
+                                                       │ (crude OR +     │
+                                                       │  adjusted OR)   │
                                                        └─────────────────┘
 ```
 

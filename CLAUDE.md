@@ -43,7 +43,7 @@ epiassist/
 │   ├── paper_parser.py
 │   ├── llm_extractor.py      # Optional LLM extraction (LangExtract + Ollama)
 │   ├── power_calculator.py
-│   ├── e_value.py
+│   ├── e_value.py            # E-value sensitivity analysis (used by pages 5 & 7)
 │   ├── meta_analysis.py      # Meta-analysis pooling (fixed/random effects)
 │   └── data_analyzer.py      # Data upload, summary, contingency tables
 ├── utils/

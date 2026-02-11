@@ -12,6 +12,7 @@ from core.data_analyzer import (
     load_data,
     summarize_columns,
 )
+from core.e_value import calculate_e_value_for_or
 from core.stats_calculator import (
     calculate_chi_square,
     calculate_mantel_haenszel,
@@ -431,6 +432,7 @@ with tab4:
             st.markdown(chi_result["interpretation"])
 
         # --- Stratified Analysis (Mantel-Haenszel) ---
+        mh_result = None
         confounders = st.session_state.get("data_confounder_cols", [])
         if confounders:
             col_summary = st.session_state.data_col_summary
@@ -497,6 +499,8 @@ with tab4:
                         st.error(f"Error in Mantel-Haenszel calculation: {e}")
                         st.stop()
 
+                    mh_result = mh
+
                     # Adjusted metrics
                     st.markdown("#### Adjusted Effect Estimates")
                     col_adj_or, col_adj_rr = st.columns(2)
@@ -555,3 +559,90 @@ with tab4:
                     # Interpretation
                     with st.expander("Mantel-Haenszel Interpretation", expanded=True):
                         st.markdown(mh["interpretation"])
+
+        # --- E-Value: Sensitivity to Unmeasured Confounding ---
+        if or_result["value"] is not None:
+            try:
+                crude_e = calculate_e_value_for_or(
+                    or_result["value"], or_result["ci_lower"], or_result["ci_upper"]
+                )
+            except Exception as e:
+                st.warning(f"Could not compute E-value: {e}")
+                crude_e = None
+
+            if crude_e is not None and crude_e["e_value"] is not None:
+                st.divider()
+                st.markdown("### E-Value: Sensitivity to Unmeasured Confounding")
+                st.caption(
+                    "How strong would unmeasured confounding need to be "
+                    "to explain away this association?"
+                )
+
+                adjusted_e = None
+                if mh_result is not None:
+                    try:
+                        adjusted_e = calculate_e_value_for_or(
+                            mh_result["or_value"],
+                            mh_result["or_ci_lower"],
+                            mh_result["or_ci_upper"],
+                        )
+                    except Exception:
+                        adjusted_e = None
+                    if adjusted_e and adjusted_e["e_value"] is None:
+                        adjusted_e = None
+
+                if adjusted_e is not None:
+                    col_crude_e, col_adj_e = st.columns(2)
+                    with col_crude_e:
+                        st.markdown("**Crude OR**")
+                        st.metric("E-value (point)", f"{crude_e['e_value']:.2f}")
+                        if crude_e["e_value_ci"] is not None:
+                            st.metric("E-value (CI)", f"{crude_e['e_value_ci']:.2f}")
+                    with col_adj_e:
+                        st.markdown("**MH-Adjusted OR**")
+                        st.metric("E-value (point)", f"{adjusted_e['e_value']:.2f}")
+                        if adjusted_e["e_value_ci"] is not None:
+                            st.metric("E-value (CI)", f"{adjusted_e['e_value_ci']:.2f}")
+                else:
+                    col_e1, col_e2 = st.columns(2)
+                    with col_e1:
+                        st.metric(
+                            "E-value (point estimate)",
+                            f"{crude_e['e_value']:.2f}",
+                        )
+                    with col_e2:
+                        if crude_e["e_value_ci"] is not None:
+                            st.metric(
+                                "E-value (confidence interval)",
+                                f"{crude_e['e_value_ci']:.2f}",
+                            )
+
+                # Robustness badge
+                e_val = crude_e["e_value"]
+                if e_val >= 5:
+                    robustness_color = "#d4edda"
+                    robustness_text = "Quite Robust"
+                elif e_val >= 3:
+                    robustness_color = "#fff3cd"
+                    robustness_text = "Moderately Robust"
+                else:
+                    robustness_color = "#f8d7da"
+                    robustness_text = "Vulnerable"
+
+                st.markdown(
+                    f'<div style="background-color: {robustness_color}; '
+                    f'padding: 15px; border-radius: 8px; text-align: center; '
+                    f'margin-top: 10px;">'
+                    f"<strong>Robustness to Unmeasured Confounding: "
+                    f"{robustness_text}</strong></div>",
+                    unsafe_allow_html=True,
+                )
+
+                with st.expander("E-Value Interpretation"):
+                    st.markdown(crude_e["interpretation"])
+                    if adjusted_e is not None:
+                        st.markdown("---")
+                        st.markdown(
+                            f"**Adjusted OR E-value:** "
+                            f"{adjusted_e['interpretation']}"
+                        )
