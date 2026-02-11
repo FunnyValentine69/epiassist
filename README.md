@@ -29,6 +29,10 @@ An epidemiological research assistant for causal inference, statistical analysis
 
 - **Power Analysis**: Calculate required sample sizes, generate power curves, and perform E-value sensitivity analysis for unmeasured confounding.
 
+- **Meta-Analysis**: Pool effect estimates from multiple studies using inverse-variance fixed-effect or DerSimonian-Laird random-effects models. Import data from the Paper Analyzer or enter manually. Generate forest plots, funnel plots, and heterogeneity statistics (I², Q, τ²).
+
+- **Data Analysis**: Upload datasets (CSV, Excel, or paste), assign outcome/exposure/confounder roles, view descriptive statistics with grouped comparisons and histograms, and auto-generate 2x2 cross-tabulations with OR, RR, RD, and Chi-square results.
+
 ## Installation
 
 ### Prerequisites

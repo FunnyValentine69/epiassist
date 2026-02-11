@@ -53,6 +53,25 @@
   - Source column ("regex"/"llm") in all display tabs and CSV export
   - Toggle auto-disabled when Ollama not running
 
+- [x] **Meta-Analysis + Forest Plot**
+  - Inverse-variance fixed-effect and DerSimonian-Laird random-effects models
+  - Forest plot (Plotly) with study weights and diamond pooled estimate
+  - Funnel plot for publication bias assessment
+  - Heterogeneity statistics (Q, I², τ²) with plain English interpretations
+  - Import from Paper Analyzer (effect measures with complete CIs)
+  - Supports ratio measures (OR, RR, HR, PR, IRR) on log scale and difference measures (MD, RD, beta)
+  - 36 tests covering validation, pooling, heterogeneity, and full pipeline
+
+- [x] **Phase 2: Data Analysis Module**
+  - Data upload (CSV, Excel, paste) with auto-delimiter detection
+  - Variable role assignment (outcome, exposure, confounders)
+  - Column summary with numeric/categorical type heuristic
+  - Descriptive statistics with grouped comparisons and Plotly histograms
+  - Auto-generated 2x2 cross-tabulation via `build_contingency_table`
+  - Reuses `stats_calculator` for OR, RR, RD, Chi-square — zero duplication
+  - 30 tests across 6 classes, 93% coverage
+  - openpyxl dependency added for Excel support
+
 - [x] **Professional Repo Polish**
   - GitHub description and topics set via `gh` CLI
   - README badges (Python, Streamlit, License)
@@ -76,8 +95,8 @@
 ### Medium-term
 - [ ] NHANES data loader
 - [ ] PubMed API integration for paper search
-- [ ] Meta-analysis calculator
-- [ ] Forest plot generation
+- [x] Meta-analysis calculator
+- [x] Forest plot generation
 
 ### Long-term
 - [ ] Manuscript generator (methods section templates)
@@ -85,10 +104,13 @@
 - [ ] Mediation analysis module
 - [ ] Export analysis sessions to PDF report
 
-## Phase 2: Data Analysis Module (Planned)
-- [ ] Data upload interface (CSV, Excel, paste)
-- [ ] Variable selector (outcome, exposure, confounders, weights)
-- [ ] Data preview and validation
+## Phase 2: Data Analysis Module (Complete)
+- [x] Data upload interface (CSV, Excel, paste)
+- [x] Variable selector (outcome, exposure, confounders)
+- [x] Data preview and validation
+- [x] Descriptive statistics (numeric + categorical, grouped by exposure)
+- [x] Auto-generated 2x2 cross-tabulation with OR/RR/RD/Chi-square
+- [x] 30 tests, 93% coverage on core/data_analyzer.py
 
 ## Phase 2.1: Basic Calculators (Planned)
 - [ ] Mantel-Haenszel adjusted OR/RR

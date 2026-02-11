@@ -5,24 +5,25 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                            STREAMLIT UI                                  │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐      │
-│  │   DAG    │ │  Stats   │ │Hypothesis│ │  Paper   │ │  Power   │      │
-│  │ Builder  │ │Calculator│ │ Testing  │ │ Analyzer │ │ Analysis │      │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘      │
-│       │            │            │            │            │             │
-└───────┼────────────┼────────────┼────────────┼────────────┼─────────────┘
-        │            │            │            │            │
-        ▼            ▼            ▼            ▼            ▼
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐│
+│  │   DAG    │ │  Stats   │ │Hypothesis│ │  Paper   │ │  Power   │ │  Meta-   │ │  Data    ││
+│  │ Builder  │ │Calculator│ │ Testing  │ │ Analyzer │ │ Analysis │ │ Analysis │ │ Analysis ││
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘│
+│       │            │            │            │            │            │            │      │
+└───────┼────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼──────┘
+        │            │            │            │            │            │            │
+        ▼            ▼            ▼            ▼            ▼            ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           CORE MODULES                                   │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐      │
 │  │   dag    │ │  stats   │ │confounder│ │  paper   │ │  power   │      │
 │  │ engine   │ │calculator│ │ detector │ │  parser  │ │calculator│      │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘      │
-│                                          ┌──────────┐ ┌──────────┐     │
-│                                          │ e_value  │ │   llm    │     │
-│                                          └──────────┘ │extractor │     │
-│                                                       └──────────┘     │
+│  ┌──────────┐                            ┌──────────┐ ┌──────────┐     │
+│  ┌──────────┐ ┌──────────┐                ┌──────────┐ ┌──────────┐     │
+│  │   meta   │ │  data    │                │ e_value  │ │   llm    │     │
+│  │ analysis │ │ analyzer │                └──────────┘ │extractor │     │
+│  └──────────┘ └──────────┘                             └──────────┘     │
 └─────────────────────────────────────────────────────────────────────────┘
         │            │            │            │            │
         ▼            ▼            ▼            ▼            ▼
@@ -85,6 +86,20 @@
 - Power curve visualization
 - E-value sensitivity analysis
 - Effect size estimation tools
+
+#### 6_Meta_Analysis.py
+- Study data entry (manual or import from Paper Analyzer)
+- Measure type and model selection
+- Forest plot generation (Plotly)
+- Funnel plot for publication bias assessment
+- Pooled estimate display with heterogeneity statistics
+
+#### 7_Data_Analysis.py
+- Data upload (CSV, Excel) and paste interface
+- Variable role assignment (outcome, exposure, confounders)
+- Descriptive statistics with grouped comparisons and histograms
+- Auto-generated 2x2 cross-tabulation using `build_contingency_table`
+- Reuses `stats_calculator` for OR, RR, RD, Chi-square on derived table
 
 ### core/ (Business Logic)
 
@@ -154,6 +169,27 @@ def calculate_power(n: int, effect_size: float, alpha: float) -> float
 def generate_power_curve(effect_size: float, alpha: float, n_range: tuple[int, int]) -> pd.DataFrame
 ```
 
+#### meta_analysis.py
+```python
+def validate_studies(studies: list[dict]) -> list[str]
+def _calculate_se_from_ci(ci_lower: float, ci_upper: float, is_log_scale: bool) -> float
+def _prepare_studies(studies: list[dict], measure_type: str) -> list[dict]
+def fixed_effect_meta(prepared: list[dict], measure_type: str) -> dict
+def heterogeneity_stats(prepared: list[dict]) -> dict
+def random_effects_meta(prepared: list[dict], tau_squared: float, measure_type: str) -> dict
+def run_meta_analysis(studies: list[dict], measure_type: str, model: str = "both") -> dict
+```
+
+#### data_analyzer.py
+```python
+def load_data(source: bytes | str, format: str) -> pd.DataFrame
+def summarize_columns(df: pd.DataFrame) -> list[dict]
+def descriptive_stats_numeric(series: pd.Series) -> dict
+def descriptive_stats_categorical(series: pd.Series) -> dict
+def grouped_descriptive_stats(df: pd.DataFrame, variable: str, group_by: str) -> dict
+def build_contingency_table(df: pd.DataFrame, outcome_col: str, exposure_col: str, outcome_positive: object, exposure_positive: object) -> dict
+```
+
 #### e_value.py
 ```python
 def calculate_e_value(point_estimate: float, ci_bound: float = None) -> dict
@@ -169,6 +205,8 @@ def interpret_risk_ratio(rr_value: float, ci_lower: float, ci_upper: float) -> s
 def interpret_p_value(p: float, alpha: float = 0.05) -> str
 def interpret_power(power: float) -> str
 def interpret_e_value(e_value: float) -> str
+def interpret_heterogeneity(i_squared: float, q_p_value: float, num_studies: int) -> str
+def interpret_meta_analysis(pooled: float, ci_lower: float, ci_upper: float, measure_type: str, model: str) -> str
 ```
 
 #### constants.py
@@ -190,6 +228,11 @@ NODE_COLORS = {
     "confounder": "#FFE66D",
     "mediator": "#95E1D3"
 }
+
+I_SQUARED_THRESHOLDS = {"low": 25, "moderate": 50, "high": 75}
+RATIO_MEASURES = {"OR", "RR", "HR", "PR", "IRR"}
+DIFFERENCE_MEASURES = {"MD", "RD", "beta"}
+META_MEASURE_LABELS = {"OR": "Odds Ratio", ...}
 ```
 
 ## Data Flow Diagrams
@@ -282,6 +325,45 @@ NODE_COLORS = {
                    └──────────────┘
 ```
 
+### Meta-Analysis Flow
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│ Study Data   │───▶│  Validate   │───▶│ Prepare     │───▶│  Fixed /    │
+│ (manual or   │    │  Studies    │    │ (log-scale  │    │  Random     │
+│  imported)   │    │             │    │  for ratios)│    │  Effects    │
+└─────────────┘    └─────────────┘    └──────┬──────┘    └──────┬──────┘
+                                             │                  │
+                                             ▼                  ▼
+                                    ┌─────────────────┐ ┌─────────────────┐
+                                    │  Heterogeneity  │ │  Forest Plot    │
+                                    │  (Q, I², τ²)    │ │  Funnel Plot    │
+                                    └─────────────────┘ └─────────────────┘
+```
+
+### Data Analysis Flow
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│ CSV/Excel/  │───▶│  load_data  │───▶│ summarize   │───▶│  Variable   │
+│ Paste Input │    │             │    │ _columns    │    │  Roles UI   │
+└─────────────┘    └─────────────┘    └─────────────┘    └──────┬──────┘
+                                                                │
+                        ┌───────────────────────────────────────┤
+                        ▼                                       ▼
+               ┌─────────────────┐                     ┌─────────────────┐
+               │  Descriptive    │                     │ build_          │
+               │  Stats (grouped │                     │ contingency_    │
+               │  + histograms)  │                     │ table → a,b,c,d │
+               └─────────────────┘                     └────────┬────────┘
+                                                                │
+                                                                ▼
+                                                       ┌─────────────────┐
+                                                       │ stats_calculator│
+                                                       │ OR, RR, RD, χ² │
+                                                       └─────────────────┘
+```
+
 ## Session State Schema
 
 ```python
@@ -315,7 +397,23 @@ st.session_state = {
         "alpha": float,
         "power": float
     },
-    "power_sample_size": int | None
+    "power_sample_size": int | None,
+
+    # Meta-Analysis
+    "meta_studies_df": pd.DataFrame,       # Study data for editing
+    "meta_results": dict | None,           # Full analysis results
+    "meta_measure_type": str,              # Selected measure type
+    "meta_model": str,                     # Selected model (fixed/random/both)
+
+    # Data Analysis
+    "data_df": pd.DataFrame | None,        # Uploaded dataset
+    "data_source_name": str,               # Filename or "Pasted data"
+    "data_col_summary": list[dict],        # Column summary from summarize_columns
+    "data_outcome_col": str | None,        # Selected outcome column
+    "data_exposure_col": str | None,       # Selected exposure column
+    "data_confounder_cols": list[str],     # Selected confounder columns
+    "data_outcome_positive": object,       # Positive outcome value
+    "data_exposure_positive": object,      # Positive exposure value
 }
 ```
 

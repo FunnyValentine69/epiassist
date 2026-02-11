@@ -4,7 +4,12 @@ This module provides functions that generate plain English explanations
 of statistical measures for non-statisticians.
 """
 
-from utils.constants import ALPHA_DEFAULT
+from utils.constants import (
+    ALPHA_DEFAULT,
+    I_SQUARED_THRESHOLDS,
+    META_MEASURE_LABELS,
+    RATIO_MEASURES,
+)
 
 
 def interpret_odds_ratio(
@@ -208,6 +213,102 @@ def interpret_e_value(e_value: float) -> str:
         f"{explanation} "
         f"An unmeasured confounder would need associations of at least {e_value:.1f} "
         f"with both the exposure and outcome to fully explain the observed effect."
+    )
+
+    return interpretation
+
+
+def interpret_heterogeneity(
+    i_squared: float, q_p_value: float, num_studies: int
+) -> str:
+    """Generate plain English interpretation of heterogeneity statistics.
+
+    Args:
+        i_squared: I-squared statistic (0-100).
+        q_p_value: P-value from Cochran's Q test.
+        num_studies: Number of studies in the meta-analysis.
+
+    Returns:
+        Plain English interpretation string.
+    """
+    if i_squared < I_SQUARED_THRESHOLDS["low"]:
+        level = "low"
+        desc = "Studies show consistent results."
+    elif i_squared < I_SQUARED_THRESHOLDS["moderate"]:
+        level = "moderate"
+        desc = "Some variability between studies exists."
+    elif i_squared < I_SQUARED_THRESHOLDS["high"]:
+        level = "substantial"
+        desc = "Considerable variability between studies. Consider exploring sources of heterogeneity."
+    else:
+        level = "considerable"
+        desc = "High variability between studies. Results should be interpreted with caution."
+
+    q_sig = "significant" if q_p_value < 0.10 else "not significant"
+
+    interpretation = (
+        f"I² = {i_squared:.1f}% ({level} heterogeneity). "
+        f"{desc} "
+        f"Cochran's Q test is {q_sig} (p = {q_p_value:.4f}), "
+        f"based on {num_studies} studies."
+    )
+
+    return interpretation
+
+
+def interpret_meta_analysis(
+    pooled: float,
+    ci_lower: float,
+    ci_upper: float,
+    measure_type: str,
+    model: str,
+) -> str:
+    """Generate plain English interpretation of a pooled meta-analysis result.
+
+    Args:
+        pooled: Pooled point estimate (on natural scale).
+        ci_lower: Lower bound of 95% CI (natural scale).
+        ci_upper: Upper bound of 95% CI (natural scale).
+        measure_type: Measure type (e.g., "OR", "RR", "MD").
+        model: Model used ("fixed" or "random").
+
+    Returns:
+        Plain English interpretation string.
+    """
+    label = META_MEASURE_LABELS.get(measure_type, measure_type)
+    model_name = "fixed-effect" if model == "fixed" else "random-effects"
+    is_ratio = measure_type in RATIO_MEASURES
+    null_value = 1.0 if is_ratio else 0.0
+
+    # Determine significance
+    if is_ratio:
+        significant = ci_lower > 1.0 or ci_upper < 1.0
+    else:
+        significant = ci_lower > 0.0 or ci_upper < 0.0
+
+    sig_text = "statistically significant" if significant else "NOT statistically significant"
+
+    # Describe direction
+    if is_ratio:
+        if pooled > 1.0:
+            direction = f"a {(pooled - 1) * 100:.0f}% increase"
+        elif pooled < 1.0:
+            direction = f"a {(1 - pooled) * 100:.0f}% decrease"
+        else:
+            direction = "no effect"
+    else:
+        if pooled > 0:
+            direction = f"an increase of {pooled:.2f}"
+        elif pooled < 0:
+            direction = f"a decrease of {abs(pooled):.2f}"
+        else:
+            direction = "no effect"
+
+    interpretation = (
+        f"Pooled {label} = {pooled:.2f} (95% CI: {ci_lower:.2f}-{ci_upper:.2f}) "
+        f"using a {model_name} model. "
+        f"The pooled estimate suggests {direction}. "
+        f"This result is {sig_text} (CI {'excludes' if significant else 'includes'} {null_value})."
     )
 
     return interpretation

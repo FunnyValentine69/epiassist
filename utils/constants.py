@@ -40,6 +40,28 @@ DEMO_DAG_NODES: list[dict[str, str]] = [
     {"name": "Other Disabilities", "type": "confounder"},
 ]
 
+# Meta-analysis constants
+I_SQUARED_THRESHOLDS: dict[str, float] = {
+    "low": 25.0,
+    "moderate": 50.0,
+    "high": 75.0,
+}
+
+RATIO_MEASURES: set[str] = {"OR", "RR", "HR", "PR", "IRR"}
+
+DIFFERENCE_MEASURES: set[str] = {"MD", "RD", "beta"}
+
+META_MEASURE_LABELS: dict[str, str] = {
+    "OR": "Odds Ratio",
+    "RR": "Risk Ratio",
+    "HR": "Hazard Ratio",
+    "PR": "Prevalence Ratio",
+    "IRR": "Incidence Rate Ratio",
+    "MD": "Mean Difference",
+    "RD": "Risk Difference",
+    "beta": "Beta Coefficient",
+}
+
 DEMO_DAG_EDGES: list[tuple[str, str]] = [
     ("Age", "Hearing Loss"),
     ("Age", "Unemployment"),

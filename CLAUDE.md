@@ -33,7 +33,9 @@ epiassist/
 │   ├── 2_Stats_Calculator.py
 │   ├── 3_Hypothesis_Testing.py
 │   ├── 4_Paper_Analyzer.py
-│   └── 5_Power_Analysis.py
+│   ├── 5_Power_Analysis.py
+│   ├── 6_Meta_Analysis.py
+│   └── 7_Data_Analysis.py
 ├── core/                     # Business logic modules
 │   ├── dag_engine.py
 │   ├── stats_calculator.py
@@ -41,7 +43,9 @@ epiassist/
 │   ├── paper_parser.py
 │   ├── llm_extractor.py      # Optional LLM extraction (LangExtract + Ollama)
 │   ├── power_calculator.py
-│   └── e_value.py
+│   ├── e_value.py
+│   ├── meta_analysis.py      # Meta-analysis pooling (fixed/random effects)
+│   └── data_analyzer.py      # Data upload, summary, contingency tables
 ├── utils/
 │   ├── interpretations.py
 │   └── constants.py
@@ -72,7 +76,7 @@ All statistical functions must return a dict with this structure:
 ### Session State
 
 - Use `st.session_state` for all cross-page persistence
-- Prefix keys by feature: `dag_`, `stats_`, `hypo_`, `paper_`, `power_`
+- Prefix keys by feature: `dag_`, `stats_`, `hypo_`, `paper_`, `power_`, `meta_`, `data_`
 
 ### Natural Language Interpretations
 
