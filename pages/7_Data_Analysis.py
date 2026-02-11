@@ -14,6 +14,7 @@ from core.data_analyzer import (
 )
 from core.stats_calculator import (
     calculate_chi_square,
+    calculate_mantel_haenszel,
     calculate_odds_ratio,
     calculate_risk_difference,
     calculate_risk_ratio,
@@ -428,3 +429,129 @@ with tab4:
 
         with st.expander("Chi-square Test Interpretation"):
             st.markdown(chi_result["interpretation"])
+
+        # --- Stratified Analysis (Mantel-Haenszel) ---
+        confounders = st.session_state.get("data_confounder_cols", [])
+        if confounders:
+            col_summary = st.session_state.data_col_summary
+            cat_confounders = [
+                c for c in confounders
+                if any(s["column"] == c and s["type"] == "categorical" for s in col_summary)
+            ]
+
+            if not cat_confounders:
+                st.info(
+                    "Stratified analysis requires categorical confounders. "
+                    "All assigned confounders are numeric."
+                )
+            else:
+                st.divider()
+                st.markdown("### Stratified Analysis (Mantel-Haenszel)")
+
+                mh_confounder = st.selectbox(
+                    "Stratify by", cat_confounders, key="data_mh_confounder"
+                )
+
+                # Build per-stratum 2x2 tables
+                strata_list = []
+                skipped_strata = []
+                for stratum_val, stratum_df in df_ct.groupby(mh_confounder):
+                    try:
+                        stratum_ct = build_contingency_table(
+                            stratum_df, outcome_col, exposure_col,
+                            outcome_pos, exposure_pos,
+                        )
+                        stratum_ct["stratum"] = stratum_val
+                        stratum_ct["confounder_name"] = mh_confounder
+                        strata_list.append(stratum_ct)
+                    except ValueError as e:
+                        skipped_strata.append((stratum_val, str(e)))
+
+                if skipped_strata:
+                    details = "; ".join(f"{name}: {reason}" for name, reason in skipped_strata)
+                    st.warning(f"Excluded {len(skipped_strata)} strata: {details}")
+
+                if len(strata_list) < 2:
+                    st.warning(
+                        "Need at least 2 valid strata for Mantel-Haenszel analysis. "
+                        f"Only {len(strata_list)} stratum has enough data."
+                    )
+                else:
+                    # Stratum-specific tables
+                    with st.expander(
+                        f"Stratum-specific tables ({len(strata_list)} strata)",
+                        expanded=False,
+                    ):
+                        for s in strata_list:
+                            st.markdown(f"**{mh_confounder} = {s['stratum']}**")
+                            s_df = pd.DataFrame(
+                                [[s["a"], s["b"]], [s["c"], s["d"]]],
+                                columns=[f"{outcome_col}+", f"{outcome_col}-"],
+                                index=[f"{exposure_col}+", f"{exposure_col}-"],
+                            )
+                            st.dataframe(s_df, use_container_width=True)
+
+                    try:
+                        mh = calculate_mantel_haenszel(strata_list)
+                    except Exception as e:
+                        st.error(f"Error in Mantel-Haenszel calculation: {e}")
+                        st.stop()
+
+                    # Adjusted metrics
+                    st.markdown("#### Adjusted Effect Estimates")
+                    col_adj_or, col_adj_rr = st.columns(2)
+                    with col_adj_or:
+                        st.metric(
+                            "MH-Adjusted OR",
+                            f"{mh['or_value']:.2f}",
+                            f"95% CI: {mh['or_ci_lower']:.2f}-{mh['or_ci_upper']:.2f}",
+                        )
+                    with col_adj_rr:
+                        if mh["rr_value"] is not None:
+                            rr_ci = ""
+                            if mh["rr_ci_lower"] is not None:
+                                rr_ci = f"95% CI: {mh['rr_ci_lower']:.2f}-{mh['rr_ci_upper']:.2f}"
+                            st.metric("MH-Adjusted RR", f"{mh['rr_value']:.2f}", rr_ci)
+                        else:
+                            st.metric("MH-Adjusted RR", "N/A")
+
+                    # Crude vs Adjusted comparison
+                    st.markdown("#### Crude vs Adjusted Comparison")
+                    col_crude, col_adj = st.columns(2)
+                    with col_crude:
+                        st.metric("Crude OR", f"{or_result['value']:.2f}")
+                    with col_adj:
+                        crude_or = or_result["value"]
+                        if crude_or is not None and crude_or != 0:
+                            pct_change = ((mh["or_value"] - crude_or) / crude_or) * 100
+                            delta_text = f"{pct_change:+.1f}% change from crude"
+                        else:
+                            delta_text = ""
+                        st.metric(
+                            "Adjusted OR",
+                            f"{mh['or_value']:.2f}",
+                            delta_text,
+                        )
+
+                    # Homogeneity test
+                    st.markdown("#### Breslow-Day Homogeneity Test")
+                    if mh["homogeneity_p_value"] is not None:
+                        bd_p = mh["homogeneity_p_value"]
+                        bd_display = "< 0.001" if bd_p < 0.001 else f"{bd_p:.4f}"
+                        st.metric(
+                            "Breslow-Day Statistic",
+                            f"{mh['homogeneity_statistic']:.2f}",
+                            f"p-value: {bd_display}",
+                        )
+                        if bd_p < 0.05:
+                            st.warning(
+                                "The OR varies significantly across strata — "
+                                "possible effect modification. Consider reporting "
+                                "stratum-specific estimates instead of the pooled OR."
+                            )
+                    else:
+                        st.info("Homogeneity test requires at least 2 strata.")
+
+                    # Interpretation
+                    with st.expander("Mantel-Haenszel Interpretation", expanded=True):
+                        st.markdown(mh["interpretation"])

@@ -112,8 +112,8 @@
 - [x] Auto-generated 2x2 cross-tabulation with OR/RR/RD/Chi-square
 - [x] 30 tests, 93% coverage on core/data_analyzer.py
 
-## Phase 2.1: Basic Calculators (Planned)
-- [ ] Mantel-Haenszel adjusted OR/RR
+## Phase 2.1: Basic Calculators (In Progress)
+- [x] Mantel-Haenszel adjusted OR/RR
 - [ ] E-value calculator (unmeasured confounding)
 - [ ] SMR/SIR calculator (standardized ratios)
 - [ ] Direct/indirect standardization

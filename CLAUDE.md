@@ -38,7 +38,7 @@ epiassist/
 │   └── 7_Data_Analysis.py
 ├── core/                     # Business logic modules
 │   ├── dag_engine.py
-│   ├── stats_calculator.py
+│   ├── stats_calculator.py   # OR, RR, RD, Chi-square, Mantel-Haenszel
 │   ├── confounder_detector.py
 │   ├── paper_parser.py
 │   ├── llm_extractor.py      # Optional LLM extraction (LangExtract + Ollama)

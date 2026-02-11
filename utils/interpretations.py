@@ -256,6 +256,78 @@ def interpret_heterogeneity(
     return interpretation
 
 
+def interpret_mantel_haenszel(
+    or_value: float,
+    or_ci_lower: float,
+    or_ci_upper: float,
+    homogeneity_p: float | None,
+    n_strata: int,
+    confounder_name: str,
+) -> str:
+    """Generate plain English interpretation of Mantel-Haenszel adjusted results.
+
+    Args:
+        or_value: MH-adjusted odds ratio.
+        or_ci_lower: Lower bound of 95% CI for adjusted OR.
+        or_ci_upper: Upper bound of 95% CI for adjusted OR.
+        homogeneity_p: P-value from Breslow-Day test (None if < 2 strata).
+        n_strata: Number of valid strata used.
+        confounder_name: Name of the stratifying confounder.
+
+    Returns:
+        Plain English interpretation string.
+    """
+    # Direction and magnitude
+    if or_value > 1:
+        direction = "higher"
+        percent_change = (or_value - 1) * 100
+    elif or_value < 1:
+        direction = "lower"
+        percent_change = (1 - or_value) * 100
+    else:
+        direction = "equal"
+        percent_change = 0.0
+
+    # Significance
+    if or_ci_lower > 1 or or_ci_upper < 1:
+        significance = "statistically significant (CI excludes 1.0)"
+    else:
+        significance = "NOT statistically significant (CI includes 1.0)"
+
+    parts = [
+        f"Adjusted OR = {or_value:.2f} (95% CI: {or_ci_lower:.2f}-{or_ci_upper:.2f}), "
+        f"stratified by {confounder_name} ({n_strata} strata)."
+    ]
+
+    if or_value != 1:
+        parts.append(
+            f"After adjusting for {confounder_name}, the exposed group has "
+            f"{percent_change:.0f}% {direction} odds of the outcome. "
+            f"This association is {significance}."
+        )
+    else:
+        parts.append(
+            f"After adjusting for {confounder_name}, there is no association "
+            f"between exposure and outcome."
+        )
+
+    # Homogeneity assessment
+    if homogeneity_p is not None:
+        if homogeneity_p < ALPHA_DEFAULT:
+            parts.append(
+                f"Breslow-Day test (p = {homogeneity_p:.4f}) suggests the OR varies "
+                f"across strata of {confounder_name} — possible effect modification. "
+                f"The pooled estimate should be interpreted with caution."
+            )
+        else:
+            parts.append(
+                f"Breslow-Day test (p = {homogeneity_p:.4f}) shows no significant "
+                f"variation in OR across strata — pooling is appropriate."
+            )
+
+    return " ".join(parts)
+
+
 def interpret_meta_analysis(
     pooled: float,
     ci_lower: float,

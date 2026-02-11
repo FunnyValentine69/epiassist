@@ -100,6 +100,7 @@
 - Descriptive statistics with grouped comparisons and histograms
 - Auto-generated 2x2 cross-tabulation using `build_contingency_table`
 - Reuses `stats_calculator` for OR, RR, RD, Chi-square on derived table
+- Mantel-Haenszel stratified analysis when confounders are assigned (adjusted OR/RR, Breslow-Day test)
 
 ### core/ (Business Logic)
 
@@ -124,6 +125,9 @@ def calculate_risk_ratio(a: int, b: int, c: int, d: int) -> dict
 def calculate_risk_difference(a: int, b: int, c: int, d: int) -> dict
 def calculate_chi_square(a: int, b: int, c: int, d: int) -> dict
 def calculate_confidence_interval(estimate: float, se: float, level: float = 0.95) -> tuple[float, float]
+def calculate_mantel_haenszel(strata: list[dict]) -> dict
+    # MH-adjusted OR/RR via statsmodels StratifiedTable
+    # Returns: or_value, or_ci, rr_value, rr_ci, mh_test, breslow_day, interpretation
 ```
 
 #### confounder_detector.py
@@ -207,6 +211,7 @@ def interpret_power(power: float) -> str
 def interpret_e_value(e_value: float) -> str
 def interpret_heterogeneity(i_squared: float, q_p_value: float, num_studies: int) -> str
 def interpret_meta_analysis(pooled: float, ci_lower: float, ci_upper: float, measure_type: str, model: str) -> str
+def interpret_mantel_haenszel(or_value: float, or_ci_lower: float, or_ci_upper: float, homogeneity_p: float | None, n_strata: int, confounder_name: str) -> str
 ```
 
 #### constants.py
@@ -361,6 +366,13 @@ META_MEASURE_LABELS = {"OR": "Odds Ratio", ...}
                                                        ┌─────────────────┐
                                                        │ stats_calculator│
                                                        │ OR, RR, RD, χ² │
+                                                       └────────┬────────┘
+                                                                │
+                                                                ▼
+                                                       ┌─────────────────┐
+                                                       │ Mantel-Haenszel │
+                                                       │ (if confounders │
+                                                       │  assigned)      │
                                                        └─────────────────┘
 ```
 

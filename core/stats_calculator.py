@@ -6,7 +6,9 @@ risk differences, and chi-square tests from 2x2 contingency tables.
 
 import math
 
+import numpy as np
 from scipy import stats
+from statsmodels.stats.contingency_tables import StratifiedTable
 
 from utils.constants import CI_LEVEL_DEFAULT, Z_SCORE_95
 
@@ -271,3 +273,134 @@ def calculate_nnt(risk_difference: float) -> dict:
         "value": round(nnt, 2),
         "interpretation": interpretation,
     }
+
+
+def calculate_mantel_haenszel(strata: list[dict]) -> dict:
+    """Calculate Mantel-Haenszel adjusted OR and RR from stratified 2x2 tables.
+
+    Args:
+        strata: List of dicts with keys a, b, c, d (one per stratum).
+            Each dict represents a 2x2 table for a confounder stratum.
+
+    Returns:
+        Dictionary with adjusted OR, RR, MH test, Breslow-Day test,
+        and plain English interpretation.
+
+    Raises:
+        ValueError: If fewer than 1 valid stratum remains after filtering.
+    """
+    # Filter out strata where any row margin is zero
+    valid = [s for s in strata if (s["a"] + s["b"]) > 0 and (s["c"] + s["d"]) > 0]
+
+    if len(valid) == 0:
+        raise ValueError(
+            "No valid strata: all strata have zero row margins."
+        )
+
+    # Stack into (2, 2, K) numpy array — StratifiedTable expects this shape
+    tables = np.array([[[s["a"], s["b"]], [s["c"], s["d"]]] for s in valid])
+    tables = tables.transpose(1, 2, 0)
+    st = StratifiedTable(tables)
+
+    # Pooled OR + CI
+    or_value = float(st.oddsratio_pooled)
+    if math.isnan(or_value) or math.isinf(or_value):
+        raise ValueError(
+            "Mantel-Haenszel pooled OR is undefined. "
+            "Check for strata where all observations fall in a single category."
+        )
+    or_ci = st.oddsratio_pooled_confint()
+    or_ci_lower, or_ci_upper = float(or_ci[0]), float(or_ci[1])
+
+    # MH test of OR = 1
+    mh_test = st.test_null_odds()
+    mh_stat = float(mh_test.statistic)
+    mh_p = float(mh_test.pvalue)
+
+    # Breslow-Day homogeneity test (needs >= 2 strata)
+    if len(valid) >= 2:
+        bd_test = st.test_equal_odds()
+        bd_stat = float(bd_test.statistic)
+        bd_p = float(bd_test.pvalue)
+    else:
+        bd_stat = None
+        bd_p = None
+
+    # Pooled RR (property exists on StratifiedTable)
+    rr_value = float(st.riskratio_pooled)
+    if math.isnan(rr_value) or math.isinf(rr_value):
+        rr_value = None
+
+    # RR CI via Greenland-Robins formula (not available on StratifiedTable)
+    rr_ci_lower, rr_ci_upper = _greenland_robins_rr_ci(valid)
+
+    # Generate interpretation
+    from utils.interpretations import interpret_mantel_haenszel
+
+    confounder_name = valid[0].get("confounder_name", valid[0].get("stratum", "confounder"))
+    interpretation = interpret_mantel_haenszel(
+        or_value, or_ci_lower, or_ci_upper, bd_p, len(valid), str(confounder_name)
+    )
+
+    return {
+        "or_value": round(or_value, 3),
+        "or_ci_lower": round(or_ci_lower, 3),
+        "or_ci_upper": round(or_ci_upper, 3),
+        "rr_value": round(rr_value, 3) if rr_value is not None else None,
+        "rr_ci_lower": round(rr_ci_lower, 3) if rr_ci_lower is not None else None,
+        "rr_ci_upper": round(rr_ci_upper, 3) if rr_ci_upper is not None else None,
+        "mh_test_statistic": round(mh_stat, 3),
+        "mh_p_value": mh_p,
+        "homogeneity_statistic": round(bd_stat, 3) if bd_stat is not None else None,
+        "homogeneity_p_value": bd_p,
+        "n_strata": len(valid),
+        "interpretation": interpretation,
+    }
+
+
+def _greenland_robins_rr_ci(strata: list[dict]) -> tuple[float | None, float | None]:
+    """Compute 95% CI for MH pooled RR using the Greenland-Robins variance.
+
+    Args:
+        strata: List of valid stratum dicts with a, b, c, d.
+
+    Returns:
+        Tuple of (lower, upper) or (None, None) if computation fails.
+    """
+    # MH pooled RR = sum(a_i * n0_i / T_i) / sum(c_i * n1_i / T_i)
+    numerator = 0.0
+    denominator = 0.0
+    var_numerator = 0.0
+
+    for s in strata:
+        a, b, c, d = s["a"], s["b"], s["c"], s["d"]
+        n1 = a + b  # exposed total
+        n0 = c + d  # unexposed total
+        T = n1 + n0
+
+        if T == 0:
+            continue
+
+        numerator += a * n0 / T
+        denominator += c * n1 / T
+
+        # Greenland-Robins variance component
+        m1 = a + c  # outcome+ total
+        var_numerator += (n1 * n0 * m1 / T - a * c) * (1 / T)
+
+    if denominator == 0 or numerator == 0:
+        return None, None
+
+    rr = numerator / denominator
+    variance = var_numerator / (numerator * denominator)
+
+    if variance <= 0:
+        return None, None
+
+    se_log_rr = math.sqrt(variance)
+
+    log_rr = math.log(rr)
+    ci_lower = math.exp(log_rr - Z_SCORE_95 * se_log_rr)
+    ci_upper = math.exp(log_rr + Z_SCORE_95 * se_log_rr)
+
+    return ci_lower, ci_upper
