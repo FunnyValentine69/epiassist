@@ -112,8 +112,36 @@ Investigate the relationship between hearing loss and employment status using NH
 - **Graphviz** - DAG visualization
 - **SciPy / statsmodels** - Statistical calculations
 - **PyMuPDF** - PDF text extraction
+- **LangExtract** - Optional LLM-based stat extraction
 - **Plotly** - Interactive visualizations
 - **Pandas** - Data manipulation
+
+## Optional: AI-Enhanced Extraction (Ollama)
+
+The Paper Analyzer can optionally use a local LLM via [Ollama](https://ollama.com) to catch statistics that regex patterns miss. This is completely free and runs locally.
+
+### Setup
+
+```bash
+# Install Ollama (macOS)
+brew install ollama
+
+# Pull the model (~4.7GB download)
+ollama pull llama3.1:8b
+
+# Start the server (keep running in a separate terminal)
+ollama serve
+```
+
+### Usage
+
+1. Start Ollama (`ollama serve`)
+2. Open Paper Analyzer in EpiAssist
+3. Check the "Enhance with AI (Ollama)" checkbox
+4. Upload a PDF and extract — the LLM runs a second pass after regex
+5. New results show "llm" in the Source column
+
+When Ollama isn't running, the checkbox is automatically disabled.
 
 ## Development
 

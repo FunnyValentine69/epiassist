@@ -13,6 +13,8 @@
 - PyMuPDF (PDF parsing)
 - Plotly (interactive charts)
 - Pandas (data manipulation)
+- LangExtract (optional — LLM-based stat extraction via Ollama)
+- requests (HTTP client for Ollama health checks)
 
 ## Code Style
 
@@ -37,6 +39,7 @@ epiassist/
 │   ├── stats_calculator.py
 │   ├── confounder_detector.py
 │   ├── paper_parser.py
+│   ├── llm_extractor.py      # Optional LLM extraction (LangExtract + Ollama)
 │   ├── power_calculator.py
 │   └── e_value.py
 ├── utils/

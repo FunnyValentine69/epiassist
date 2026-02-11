@@ -14,6 +14,7 @@ from core.paper_parser import (
     find_standard_deviations,
     find_weighted_statistics,
 )
+from core.llm_extractor import is_llm_available, extract_with_llm, merge_results
 
 st.set_page_config(page_title="Paper Analyzer - EpiAssist", layout="wide")
 
@@ -42,6 +43,15 @@ with col1:
     else:
         st.info("Upload a PDF to extract statistics.")
         extract_btn = False
+
+    llm_available = is_llm_available()
+    use_llm = st.checkbox(
+        "Enhance with AI (Ollama)",
+        value=False,
+        disabled=not llm_available,
+        help="Run a second-pass LLM extraction via local Ollama to catch stats that regex misses."
+        + ("" if llm_available else " (Ollama not detected — install and run 'ollama serve')"),
+    )
 
     st.markdown("### What We Extract")
     st.markdown("""
@@ -96,8 +106,7 @@ with col2:
                     standard_deviations.extend(find_standard_deviations(page_text, page=page_num))
                     weighted_statistics.extend(find_weighted_statistics(page_text, page=page_num))
 
-                # Store results
-                st.session_state.paper_results = {
+                regex_results = {
                     "effect_measures": effect_measures,
                     "confidence_intervals": confidence_intervals,
                     "p_values": p_values,
@@ -107,6 +116,43 @@ with col2:
                     "standard_deviations": standard_deviations,
                     "weighted_statistics": weighted_statistics,
                 }
+
+            # LLM second pass (optional)
+            if use_llm:
+                llm_all = {cat: [] for cat in regex_results}
+                progress = st.progress(0, text="Running AI extraction...")
+                for i, (page_num, page_text) in enumerate(pages):
+                    progress.progress(
+                        (i + 1) / len(pages),
+                        text=f"AI extracting page {page_num}...",
+                    )
+                    page_llm = extract_with_llm(page_text, page=page_num)
+                    for cat in llm_all:
+                        llm_all[cat].extend(page_llm.get(cat, []))
+                progress.empty()
+
+                regex_count = sum(len(v) for v in regex_results.values())
+                final_results = merge_results(regex_results, llm_all)
+                final_count = sum(len(v) for v in final_results.values())
+                llm_added = final_count - regex_count
+                if llm_added > 0:
+                    st.info(f"AI found {llm_added} additional statistic(s)")
+                else:
+                    llm_total = sum(len(v) for v in llm_all.values())
+                    if llm_total == 0:
+                        st.warning("AI extraction returned no results. Check that Ollama is running with llama3.1:8b loaded.")
+                    else:
+                        st.info("AI found no additional statistics beyond regex.")
+            else:
+                # Tag all regex results with source
+                final_results = regex_results
+                for cat in final_results:
+                    for item in final_results[cat]:
+                        item["source"] = "regex"
+
+            with st.spinner("Storing results..."):
+                # Store results
+                st.session_state.paper_results = final_results
 
             st.success("Extraction complete.")
         except Exception as e:
@@ -149,6 +195,7 @@ with col2:
                             "CI Upper": item["ci_upper"] or "-",
                             "Adjusted?": adjusted_str,
                             "Adjusted For": adj_for_str,
+                            "Source": item.get("source", "regex"),
                             "Context": item["context"][:60] + "...",
                         }
                     )
@@ -172,6 +219,7 @@ with col2:
                             "CI Lower": item["ci_lower"] or "-",
                             "CI Upper": item["ci_upper"] or "-",
                             "SE": item["se"] or "-",
+                            "Source": item.get("source", "regex"),
                             "Context": item["context"][:60] + "...",
                         }
                     )
@@ -190,6 +238,7 @@ with col2:
                             "Level": f"{item['level']}%",
                             "Lower": item["lower"],
                             "Upper": item["upper"],
+                            "Source": item.get("source", "regex"),
                             "Context": item["context"][:60] + "...",
                         }
                     )
@@ -210,6 +259,7 @@ with col2:
                             "P-value": item["value"],
                             "Operator": item["operator"],
                             "Significant (α=0.05)": "Yes" if item["value"] < 0.05 else "No",
+                            "Source": item.get("source", "regex"),
                             "Context": item["context"][:60] + "...",
                         }
                     )
@@ -228,6 +278,7 @@ with col2:
                             "Value": item["value"],
                             "CI Lower": item["ci_lower"] or "-",
                             "CI Upper": item["ci_upper"] or "-",
+                            "Source": item.get("source", "regex"),
                             "Context": item["context"][:60] + "...",
                         }
                     )
@@ -246,6 +297,7 @@ with col2:
                             "Type": item["type"],
                             "Mean": item["mean"] or "-",
                             "Value": item["value"],
+                            "Source": item.get("source", "regex"),
                             "Context": item["context"][:60] + "...",
                         }
                     )
@@ -264,6 +316,7 @@ with col2:
                             "Type": item["stat_type"],
                             "Value": item["value"],
                             "Weight Method": item["weight_method"] or "-",
+                            "Source": item.get("source", "regex"),
                             "Context": item["context"][:60] + "...",
                         }
                     )
@@ -280,6 +333,7 @@ with col2:
                         {
                             "Page": item["page"],
                             "Sample Size": f"n = {item['value']:,}",
+                            "Source": item.get("source", "regex"),
                         }
                     )
                 st.dataframe(pd.DataFrame(n_data), use_container_width=True)
@@ -303,6 +357,7 @@ with col2:
                         "CI Upper": item["ci_upper"],
                         "Adjusted": item.get("adjusted"),
                         "Adjusted For": item.get("adjusted_for"),
+                        "Source": item.get("source", "regex"),
                         "Context": item["context"],
                     }
                 )
@@ -316,6 +371,7 @@ with col2:
                         "CI Lower": item["ci_lower"],
                         "CI Upper": item["ci_upper"],
                         "SE": item["se"],
+                        "Source": item.get("source", "regex"),
                         "Context": item["context"],
                     }
                 )
@@ -327,6 +383,7 @@ with col2:
                         "Page": item["page"],
                         "Value": item["value"],
                         "Operator": item["operator"],
+                        "Source": item.get("source", "regex"),
                         "Context": item["context"],
                     }
                 )
@@ -339,6 +396,7 @@ with col2:
                         "Value": item["value"],
                         "CI Lower": item["ci_lower"],
                         "CI Upper": item["ci_upper"],
+                        "Source": item.get("source", "regex"),
                         "Context": item["context"],
                     }
                 )
@@ -350,6 +408,7 @@ with col2:
                         "Page": item["page"],
                         "Value": item["value"],
                         "Mean": item["mean"],
+                        "Source": item.get("source", "regex"),
                         "Context": item["context"],
                     }
                 )
@@ -361,6 +420,7 @@ with col2:
                         "Page": item["page"],
                         "Value": item["value"],
                         "Weight Method": item["weight_method"],
+                        "Source": item.get("source", "regex"),
                         "Context": item["context"],
                     }
                 )
@@ -371,6 +431,7 @@ with col2:
                         "Type": "Sample Size",
                         "Page": item["page"],
                         "Value": item["value"],
+                        "Source": item.get("source", "regex"),
                     }
                 )
 
@@ -412,9 +473,10 @@ st.markdown("### How It Works")
 st.markdown("""
 1. **Text Extraction**: We use PyMuPDF to extract text from your PDF
 2. **Pattern Matching**: Regular expressions identify statistical measures
-3. **Adjustment Detection**: Identifies adjusted vs crude effect measures
-4. **Structured Output**: Results are organized in tabs for easy review
-5. **Export**: Download extracted statistics as CSV
+3. **AI Enhancement** (optional): LLM second-pass via local Ollama catches stats regex misses
+4. **Deduplication**: Regex and AI results are merged, duplicates removed
+5. **Structured Output**: Results are organized in tabs for easy review
+6. **Export**: Download extracted statistics as CSV
 
 **Patterns detected:**
 - `aOR = 2.5 (95% CI: 1.2-3.8)` → Adjusted odds ratio

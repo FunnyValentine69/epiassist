@@ -46,12 +46,19 @@
   - Add SD/SE extraction
   - Diagnostic scripts for pattern testing
 
+- [x] **LLM-Enhanced Extraction (LangExtract + Ollama)**
+  - Optional second-pass LLM extraction via local Ollama (llama3.1:8b)
+  - LangExtract with few-shot examples for all 8 stat categories
+  - Float-equal deduplication to merge regex + LLM results
+  - Source column ("regex"/"llm") in all display tabs and CSV export
+  - Toggle auto-disabled when Ollama not running
+
 ## Known Limitations
 
 - **Paper Analyzer**
   - Table data extraction not implemented
   - Figure/chart data not extracted
-  - Some papers use non-standard formats
+  - LLM extraction requires local Ollama install (~10-15s/page)
 
 - **Data Integration**
   - No NHANES data loader yet

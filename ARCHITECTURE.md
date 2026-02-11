@@ -19,9 +19,10 @@
 │  │   dag    │ │  stats   │ │confounder│ │  paper   │ │  power   │      │
 │  │ engine   │ │calculator│ │ detector │ │  parser  │ │calculator│      │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘      │
-│                                          ┌──────────┐                   │
-│                                          │ e_value  │                   │
-│                                          └──────────┘                   │
+│                                          ┌──────────┐ ┌──────────┐     │
+│                                          │ e_value  │ │   llm    │     │
+│                                          └──────────┘ │extractor │     │
+│                                                       └──────────┘     │
 └─────────────────────────────────────────────────────────────────────────┘
         │            │            │            │            │
         ▼            ▼            ▼            ▼            ▼
@@ -136,6 +137,16 @@ def find_weighted_statistics(text: str, page: int = 1) -> list[dict]
     # Returns dicts with: stat_type, value, weight_method (str|None), context, page
 ```
 
+#### llm_extractor.py (optional — requires LangExtract + Ollama)
+```python
+def is_llm_available(model_id: str = "llama3.1:8b") -> bool
+    # Checks langextract importable + Ollama server reachable
+def extract_with_llm(text: str, page: int = 1, model_id: str = "llama3.1:8b") -> dict[str, list[dict]]
+    # LangExtract extraction for a single page, returns same 8-key dict as paper_results
+def merge_results(regex_results: dict, llm_results: dict) -> dict[str, list[dict]]
+    # Deduplicates using float-equal comparison, tags source="regex"|"llm"
+```
+
 #### power_calculator.py
 ```python
 def calculate_sample_size(effect_size: float, alpha: float, power: float) -> int
@@ -231,12 +242,26 @@ NODE_COLORS = {
 
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│ PDF Upload  │───▶│  PyMuPDF    │───▶│   Regex     │───▶│  Extracted  │
-│             │    │  Extract    │    │  Patterns   │    │   Stats     │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-                                                               │
-         ┌─────────────────────────────────────────────────────┤
-         ▼           ▼           ▼           ▼           ▼     ▼
+│ PDF Upload  │───▶│  PyMuPDF    │───▶│   Regex     │───▶│ Regex Stats │
+│             │    │  Extract    │    │  Patterns   │    │             │
+└─────────────┘    └─────────────┘    └──────┬──────┘    └──────┬──────┘
+                                             │                  │
+                                             ▼                  │
+                                    ┌─────────────────┐         │
+                                    │  LLM Extractor  │         │
+                                    │  (LangExtract   │         │
+                                    │   + Ollama)     │         │
+                                    │  [optional]     │         │
+                                    └────────┬────────┘         │
+                                             │                  │
+                                             ▼                  ▼
+                                    ┌─────────────────────────────┐
+                                    │   Merge + Deduplicate       │
+                                    │  (float-equal comparison)   │
+                                    └──────────────┬──────────────┘
+                                                   │
+         ┌─────────────────────────────────────────┤
+         ▼           ▼           ▼           ▼     ▼       ▼
    ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
    │ OR/HR/RR │ │  Beta    │ │   CIs    │ │ P-values │ │  SD/SE   │
    └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
