@@ -139,6 +139,12 @@ def calculate_mantel_haenszel(strata: list[dict]) -> dict
 def find_confounders(dag: nx.DiGraph, exposure: str, outcome: str) -> list[str]
 def find_backdoor_paths(dag: nx.DiGraph, exposure: str, outcome: str) -> list[list[str]]
 def suggest_adjustment_set(dag: nx.DiGraph, exposure: str, outcome: str) -> list[str]
+def normalize_variable_name(name: str) -> str
+    # Strips whitespace, lowercases, replaces _ and - with spaces
+def match_columns_to_dag_nodes(column_names: list[str], dag_node_names: list[str]) -> dict[str, str]
+    # Returns DAG node name → matched column name (exact normalized comparison)
+def compare_adjustment_sets(dag_set: list[str], paper_set: list[str]) -> dict[str, list[str]]
+    # Returns overlap, dag_only, paper_only (original names preserved)
 ```
 
 #### paper_parser.py
@@ -537,6 +543,20 @@ python scripts/diagnose_extraction.py ./my_papers  # Custom folder
 - Beta Coefficients: 6 patterns, Mean Differences: 4 patterns, SD/SE: 6 patterns
 - Weighted Statistics: 5 patterns (prevalence, mean, IPW, PS-weighted, weighted OR/HR/RR)
 - Note: Per-pattern counts may exceed totals due to deduplication
+
+## Cross-Page Integration
+
+### DAG → Data Analysis (Feature A)
+- Data Analysis Tab 2 checks for `dag_engine`, `dag_exposure`, `dag_outcome` in session state
+- Calls `suggest_adjustment_set()` → `match_columns_to_dag_nodes()` to match DAG confounders to dataset columns
+- Shows info banner with matched variables and "Apply DAG suggestions" button
+- Button-triggered (not auto-applied) — user keeps full control of the multiselect
+
+### Paper Analyzer → DAG Builder (Feature B)
+- DAG Builder checks for `paper_results` in session state after confounder detection
+- Filters to adjusted effect measures with `adjusted_for` fields
+- Normalizes and compares paper adjustment set vs DAG adjustment set
+- Shows overlap, DAG-only (warning), and paper-only (info) in an expander
 
 ## Error Handling Strategy
 

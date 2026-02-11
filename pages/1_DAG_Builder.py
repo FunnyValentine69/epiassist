@@ -1,9 +1,14 @@
 """DAG Builder page for creating and visualizing causal diagrams."""
 
+import re
+
 import streamlit as st
 
 from core.dag_engine import DAGEngine
-from core.confounder_detector import find_confounders, suggest_adjustment_set
+from core.confounder_detector import (
+    compare_adjustment_sets,
+    suggest_adjustment_set,
+)
 from utils.constants import DEMO_DAG_NODES, DEMO_DAG_EDGES
 
 st.set_page_config(page_title="DAG Builder - EpiAssist", layout="wide")
@@ -169,25 +174,64 @@ with col2:
         # Run confounder analysis
         if st.session_state.dag_exposure and st.session_state.dag_outcome:
             if st.button("Detect Confounders"):
-                confounders = find_confounders(
-                    engine.graph,
-                    st.session_state.dag_exposure,
-                    st.session_state.dag_outcome,
-                )
-
                 adjustment_set = suggest_adjustment_set(
                     engine.graph,
                     st.session_state.dag_exposure,
                     st.session_state.dag_outcome,
                 )
 
-                if confounders:
-                    st.success(f"**Confounders found:** {', '.join(confounders)}")
+                if adjustment_set:
+                    st.success(f"**Confounders found:** {', '.join(adjustment_set)}")
                     st.info(f"**Suggested adjustment set:** {', '.join(adjustment_set)}")
                     st.markdown("""
                     To estimate the causal effect of the exposure on the outcome,
                     you should adjust for these variables in your analysis.
                     """)
+
+                    # Paper Analyzer comparison
+                    if "paper_results" in st.session_state:
+                        try:
+                            paper_results = st.session_state.paper_results
+                            adjusted_measures = [
+                                m
+                                for m in paper_results.get("effect_measures", [])
+                                if m.get("adjusted") is True
+                                and isinstance(m.get("adjusted_for"), str)
+                                and m.get("adjusted_for")
+                            ]
+
+                            with st.expander("Compare with Paper Adjustments", expanded=False):
+                                if not adjusted_measures:
+                                    st.info(
+                                        "No adjusted effect measures with named covariates "
+                                        "found in the analyzed paper."
+                                    )
+                                else:
+                                    for measure in adjusted_measures:
+                                        paper_vars = [
+                                            v.strip()
+                                            for v in re.split(r",|\band\b", measure["adjusted_for"])
+                                            if v.strip()
+                                        ]
+                                        comparison = compare_adjustment_sets(
+                                            adjustment_set, paper_vars
+                                        )
+
+                                        label = f"{measure['type']} = {measure['value']}"
+                                        st.markdown(f"**{label}** (adjusted for: {measure['adjusted_for']})")
+
+                                        if comparison["overlap"]:
+                                            st.markdown(f"Overlap: {', '.join(comparison['overlap'])}")
+                                        if comparison["dag_only"]:
+                                            st.warning(
+                                                f"In DAG but not in paper: {', '.join(comparison['dag_only'])}"
+                                            )
+                                        if comparison["paper_only"]:
+                                            st.info(
+                                                f"In paper but not in DAG: {', '.join(comparison['paper_only'])}"
+                                            )
+                        except Exception as e:
+                            st.warning(f"Could not compare with paper adjustments: {e}")
                 else:
                     st.info("No confounders detected between exposure and outcome.")
     else:

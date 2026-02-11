@@ -21,6 +21,10 @@ from core.regression import (
     run_logistic_regression,
     run_poisson_regression,
 )
+from core.confounder_detector import (
+    match_columns_to_dag_nodes,
+    suggest_adjustment_set,
+)
 from core.stats_calculator import (
     calculate_chi_square,
     calculate_mantel_haenszel,
@@ -200,6 +204,36 @@ with tab2:
                          if c != st.session_state.get("data_outcome_col")
                          and c != st.session_state.get("data_exposure_col")
                          and c != st.session_state.get("data_weight_col")]
+
+            # DAG-based confounder suggestions
+            if (
+                "dag_engine" in st.session_state
+                and st.session_state.get("dag_exposure")
+                and st.session_state.get("dag_outcome")
+            ):
+                try:
+                    dag_engine = st.session_state.dag_engine
+                    adj_set = suggest_adjustment_set(
+                        dag_engine.graph,
+                        st.session_state.dag_exposure,
+                        st.session_state.dag_outcome,
+                    )
+                    if adj_set:
+                        matched = match_columns_to_dag_nodes(remaining, adj_set)
+                        if matched:
+                            matched_display = ", ".join(
+                                f"**{node}** → `{col}`" for node, col in matched.items()
+                            )
+                            st.info(f"DAG suggests adjusting for: {matched_display}")
+                            unmatched = [n for n in adj_set if n not in matched]
+                            if unmatched:
+                                st.caption(f"Not found in data: {', '.join(unmatched)}")
+                            if st.button("Apply DAG suggestions", key="data_dag_apply_btn"):
+                                st.session_state.data_confounder_cols_select = list(matched.values())
+                                st.rerun()
+                except Exception as e:
+                    st.warning(f"Could not load DAG suggestions: {e}")
+
             confounder_cols = st.multiselect(
                 "Confounder variables (optional)",
                 remaining,

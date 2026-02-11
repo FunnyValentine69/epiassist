@@ -128,6 +128,73 @@ def suggest_adjustment_set(
     return find_confounders(dag, exposure, outcome)
 
 
+def normalize_variable_name(name: str) -> str:
+    """Normalize a variable name for matching.
+
+    Strips whitespace, lowercases, replaces underscores and hyphens with spaces.
+    Enables matching "Hearing Loss" ↔ "hearing_loss" ↔ "hearing-loss".
+
+    Args:
+        name: Variable name to normalize.
+
+    Returns:
+        Normalized name string.
+    """
+    return name.strip().lower().replace("_", " ").replace("-", " ")
+
+
+def match_columns_to_dag_nodes(
+    column_names: list[str], dag_node_names: list[str]
+) -> dict[str, str]:
+    """Match dataset columns to DAG node names using normalized comparison.
+
+    Args:
+        column_names: List of column names from the dataset.
+        dag_node_names: List of node names from the DAG.
+
+    Returns:
+        Dict mapping DAG node name → matched column name (only includes matches).
+    """
+    col_lookup = {normalize_variable_name(col): col for col in column_names}
+
+    matches = {}
+    for node in dag_node_names:
+        normalized_node = normalize_variable_name(node)
+        if normalized_node in col_lookup:
+            matches[node] = col_lookup[normalized_node]
+
+    return matches
+
+
+def compare_adjustment_sets(
+    dag_set: list[str], paper_set: list[str]
+) -> dict[str, list[str]]:
+    """Compare DAG adjustment set with paper-reported adjustment variables.
+
+    Uses normalized name matching to find overlap and differences.
+
+    Args:
+        dag_set: Variable names from DAG's suggested adjustment set.
+        paper_set: Variable names reported in the paper.
+
+    Returns:
+        Dict with keys 'overlap', 'dag_only', 'paper_only', each containing
+        a list of original (non-normalized) variable names.
+    """
+    dag_normalized = {normalize_variable_name(v): v for v in dag_set}
+    paper_normalized = {normalize_variable_name(v): v for v in paper_set}
+
+    overlap_keys = set(dag_normalized) & set(paper_normalized)
+    dag_only_keys = set(dag_normalized) - set(paper_normalized)
+    paper_only_keys = set(paper_normalized) - set(dag_normalized)
+
+    return {
+        "overlap": [dag_normalized[k] for k in overlap_keys],
+        "dag_only": [dag_normalized[k] for k in dag_only_keys],
+        "paper_only": [paper_normalized[k] for k in paper_only_keys],
+    }
+
+
 def get_direct_causes(dag: nx.DiGraph, node: str) -> list[str]:
     """Get all direct causes (parents) of a node.
 

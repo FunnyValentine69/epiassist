@@ -133,6 +133,8 @@
 - [x] Survey-weighted interpretation prefix in regression output
 - [x] 19 new tests (9 data_analyzer + 10 regression weighted tests)
 
-## Phase 3: Integration (Future)
-- [ ] DAG → auto-suggest confounders for regression
-- [ ] Paper extraction → compare to DAG recommendations
+## Phase 3: DAG + Paper Integration (Complete)
+- [x] DAG → auto-suggest confounders in Data Analysis Tab 2 (via `match_columns_to_dag_nodes`)
+- [x] Paper extraction → compare adjustment sets on DAG Builder page
+- [x] Name normalization functions (`normalize_variable_name`, `match_columns_to_dag_nodes`)
+- [x] 15 tests for matching functions

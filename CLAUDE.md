@@ -82,6 +82,12 @@ All statistical functions must return a dict with this structure:
 - Use `st.session_state` for all cross-page persistence
 - Prefix keys by feature: `dag_`, `stats_`, `hypo_`, `paper_`, `power_`, `meta_`, `data_`, `smr_`, `direct_`, `data_reg_`, `data_weight_col`
 
+### Cross-Page Integration
+
+- Pages read other pages' session state keys (e.g., `dag_engine`, `paper_results`) but never write to them
+- Integration features are optional — guard with `if "key" in st.session_state` checks
+- Use `normalize_variable_name()` from `confounder_detector` for cross-module name matching
+
 ### Natural Language Interpretations
 
 All statistical outputs must include plain English interpretations suitable for non-statisticians.
