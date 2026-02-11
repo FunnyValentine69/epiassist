@@ -118,10 +118,12 @@
 - [x] SMR/SIR calculator (standardized ratios)
 - [x] Direct/indirect standardization
 
-## Phase 2.2: Regression Analysis (Planned)
-- [ ] Logistic regression → adjusted ORs
-- [ ] Linear regression → adjusted βs
-- [ ] Poisson regression → adjusted IRRs
+## Phase 2.2: Regression Analysis (Complete)
+- [x] Logistic regression → adjusted ORs (GLM Binomial)
+- [x] Linear regression → adjusted βs (GLM Gaussian)
+- [x] Poisson regression → adjusted IRRs (GLM Poisson)
+- [x] Data Analysis Tab 5 with model selection, coefficient tables, model fit stats
+- [x] 22 tests across 6 classes covering data prep, all 3 models, and interpretations
 
 ## Phase 2.3: Survey-Weighted Analysis (Planned)
 - [ ] Weighted means/proportions

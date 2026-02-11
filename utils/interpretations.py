@@ -486,3 +486,144 @@ def interpret_meta_analysis(
     )
 
     return interpretation
+
+
+def interpret_logistic_regression(
+    exposure_name: str,
+    or_value: float,
+    ci_lower: float,
+    ci_upper: float,
+    p_value: float,
+    confounder_names: list[str],
+    n_obs: int,
+) -> str:
+    """Generate plain English interpretation of logistic regression results.
+
+    Args:
+        exposure_name: Name of the exposure variable.
+        or_value: Adjusted odds ratio for exposure.
+        ci_lower: Lower bound of 95% CI for OR.
+        ci_upper: Upper bound of 95% CI for OR.
+        p_value: P-value for the exposure coefficient.
+        confounder_names: List of confounder variable names adjusted for.
+        n_obs: Number of observations used in the model.
+
+    Returns:
+        Plain English interpretation string.
+    """
+    if or_value > 1:
+        direction = f"{(or_value - 1) * 100:.0f}% higher odds"
+    elif or_value < 1:
+        direction = f"{(1 - or_value) * 100:.0f}% lower odds"
+    else:
+        direction = "no difference in odds"
+
+    sig = "statistically significant" if p_value < ALPHA_DEFAULT else "NOT statistically significant"
+    p_str = "< 0.001" if p_value < 0.001 else f"= {p_value:.4f}"
+
+    if confounder_names:
+        adj_text = f"adjusted for {', '.join(confounder_names)}"
+    else:
+        adj_text = "unadjusted (no confounders)"
+
+    return (
+        f"Adjusted OR = {or_value:.2f} (95% CI: {ci_lower:.2f}-{ci_upper:.2f}, "
+        f"p {p_str}), {adj_text}, based on {n_obs:,} observations. "
+        f"Exposure to {exposure_name} is associated with {direction} "
+        f"of the outcome. This association is {sig}."
+    )
+
+
+def interpret_linear_regression(
+    exposure_name: str,
+    beta: float,
+    ci_lower: float,
+    ci_upper: float,
+    p_value: float,
+    confounder_names: list[str],
+    n_obs: int,
+    r_squared: float,
+) -> str:
+    """Generate plain English interpretation of linear regression results.
+
+    Args:
+        exposure_name: Name of the exposure variable.
+        beta: Adjusted beta coefficient for exposure.
+        ci_lower: Lower bound of 95% CI for beta.
+        ci_upper: Upper bound of 95% CI for beta.
+        p_value: P-value for the exposure coefficient.
+        confounder_names: List of confounder variable names adjusted for.
+        n_obs: Number of observations used in the model.
+        r_squared: R-squared of the model.
+
+    Returns:
+        Plain English interpretation string.
+    """
+    if beta > 0:
+        direction = f"an increase of {beta:.2f}"
+    elif beta < 0:
+        direction = f"a decrease of {abs(beta):.2f}"
+    else:
+        direction = "no change"
+
+    sig = "statistically significant" if p_value < ALPHA_DEFAULT else "NOT statistically significant"
+    p_str = "< 0.001" if p_value < 0.001 else f"= {p_value:.4f}"
+
+    if confounder_names:
+        adj_text = f"adjusted for {', '.join(confounder_names)}"
+    else:
+        adj_text = "unadjusted (no confounders)"
+
+    return (
+        f"Adjusted β = {beta:.2f} (95% CI: {ci_lower:.2f}-{ci_upper:.2f}, "
+        f"p {p_str}), {adj_text}, based on {n_obs:,} observations. "
+        f"A one-unit increase in {exposure_name} is associated with {direction} "
+        f"in the outcome. This association is {sig}. "
+        f"The model explains {r_squared * 100:.1f}% of variance (R² = {r_squared:.4f})."
+    )
+
+
+def interpret_poisson_regression(
+    exposure_name: str,
+    irr: float,
+    ci_lower: float,
+    ci_upper: float,
+    p_value: float,
+    confounder_names: list[str],
+    n_obs: int,
+) -> str:
+    """Generate plain English interpretation of Poisson regression results.
+
+    Args:
+        exposure_name: Name of the exposure variable.
+        irr: Adjusted incidence rate ratio for exposure.
+        ci_lower: Lower bound of 95% CI for IRR.
+        ci_upper: Upper bound of 95% CI for IRR.
+        p_value: P-value for the exposure coefficient.
+        confounder_names: List of confounder variable names adjusted for.
+        n_obs: Number of observations used in the model.
+
+    Returns:
+        Plain English interpretation string.
+    """
+    if irr > 1:
+        direction = f"{(irr - 1) * 100:.0f}% higher rate"
+    elif irr < 1:
+        direction = f"{(1 - irr) * 100:.0f}% lower rate"
+    else:
+        direction = "no difference in rate"
+
+    sig = "statistically significant" if p_value < ALPHA_DEFAULT else "NOT statistically significant"
+    p_str = "< 0.001" if p_value < 0.001 else f"= {p_value:.4f}"
+
+    if confounder_names:
+        adj_text = f"adjusted for {', '.join(confounder_names)}"
+    else:
+        adj_text = "unadjusted (no confounders)"
+
+    return (
+        f"Adjusted IRR = {irr:.2f} (95% CI: {ci_lower:.2f}-{ci_upper:.2f}, "
+        f"p {p_str}), {adj_text}, based on {n_obs:,} observations. "
+        f"Exposure to {exposure_name} is associated with {direction} "
+        f"of the outcome. This association is {sig}."
+    )

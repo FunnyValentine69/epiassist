@@ -13,6 +13,11 @@ from core.data_analyzer import (
     summarize_columns,
 )
 from core.e_value import calculate_e_value_for_or
+from core.regression import (
+    run_linear_regression,
+    run_logistic_regression,
+    run_poisson_regression,
+)
 from core.stats_calculator import (
     calculate_chi_square,
     calculate_mantel_haenszel,
@@ -40,8 +45,9 @@ statistics, and generate 2x2 cross-tabulations with effect estimates.
 st.divider()
 
 # --- Tabs ---
-tab1, tab2, tab3, tab4 = st.tabs([
-    "Upload & Preview", "Variable Roles", "Descriptive Statistics", "Cross-Tabulation"
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "Upload & Preview", "Variable Roles", "Descriptive Statistics",
+    "Cross-Tabulation", "Regression Analysis",
 ])
 
 # --- Tab 1: Upload & Preview ---
@@ -646,3 +652,128 @@ with tab4:
                             f"**Adjusted OR E-value:** "
                             f"{adjusted_e['interpretation']}"
                         )
+
+
+# --- Tab 5: Regression Analysis ---
+with tab5:
+    if "data_df" not in st.session_state:
+        st.info("Upload data in the first tab to run regression analysis.")
+    elif "data_outcome_col" not in st.session_state or "data_exposure_col" not in st.session_state:
+        st.warning("Assign both outcome and exposure variables in the Variable Roles tab first.")
+    else:
+        df_reg = st.session_state.data_df
+        reg_outcome = st.session_state.data_outcome_col
+        reg_exposure = st.session_state.data_exposure_col
+        reg_confounders = st.session_state.get("data_confounder_cols", [])
+        reg_outcome_pos = st.session_state.get("data_outcome_positive")
+        reg_exposure_pos = st.session_state.get("data_exposure_positive")
+
+        # Model type selection
+        reg_model_type = st.radio(
+            "Regression model",
+            ["Logistic (OR)", "Linear (β)", "Poisson (IRR)"],
+            horizontal=True,
+            key="data_reg_model_type",
+        )
+
+        # Clear stale results if model type changed
+        prev_result = st.session_state.get("data_reg_result")
+        if prev_result is not None:
+            model_map = {"Logistic (OR)": "logistic", "Linear (β)": "linear", "Poisson (IRR)": "poisson"}
+            if prev_result["model_type"] != model_map.get(reg_model_type):
+                del st.session_state["data_reg_result"]
+
+        # Info box showing variable assignments
+        conf_text = ", ".join(reg_confounders) if reg_confounders else "None"
+        st.info(
+            f"**Outcome:** {reg_outcome}  \n"
+            f"**Exposure:** {reg_exposure}  \n"
+            f"**Confounders:** {conf_text}"
+        )
+
+        # Model-specific validation messages
+        if reg_model_type == "Logistic (OR)" and reg_outcome_pos is None:
+            st.warning("Select a positive outcome value in the Variable Roles tab for logistic regression.")
+        elif st.button("Run Regression", key="data_reg_run_btn"):
+            st.session_state.pop("data_reg_result", None)
+            try:
+                if reg_model_type == "Logistic (OR)":
+                    reg_result = run_logistic_regression(
+                        df_reg, reg_outcome, reg_exposure, reg_confounders,
+                        outcome_positive=reg_outcome_pos,
+                        exposure_positive=reg_exposure_pos,
+                    )
+                    effect_label = "Adjusted OR"
+                elif reg_model_type == "Linear (β)":
+                    reg_result = run_linear_regression(
+                        df_reg, reg_outcome, reg_exposure, reg_confounders,
+                        exposure_positive=reg_exposure_pos,
+                    )
+                    effect_label = "Adjusted β"
+                else:
+                    reg_result = run_poisson_regression(
+                        df_reg, reg_outcome, reg_exposure, reg_confounders,
+                        exposure_positive=reg_exposure_pos,
+                    )
+                    effect_label = "Adjusted IRR"
+
+                st.session_state.data_reg_result = reg_result
+
+            except ValueError as e:
+                st.error(f"Regression error: {e}")
+            except Exception as e:
+                st.error(f"Unexpected error: {e}")
+
+        # Display results
+        if "data_reg_result" in st.session_state:
+            reg_result = st.session_state.data_reg_result
+            exp_eff = reg_result["exposure_effect"]
+            model_fit = reg_result["model_fit"]
+
+            # Effect label based on model type
+            if reg_result["model_type"] == "logistic":
+                effect_label = "Adjusted OR"
+            elif reg_result["model_type"] == "linear":
+                effect_label = "Adjusted β"
+            else:
+                effect_label = "Adjusted IRR"
+
+            # Primary result metric
+            st.markdown("### Exposure Effect")
+            st.metric(
+                effect_label,
+                f"{exp_eff['effect']:.3f}",
+                f"95% CI: {exp_eff['ci_lower']:.3f}-{exp_eff['ci_upper']:.3f}",
+            )
+
+            # Coefficient table
+            st.markdown("### All Coefficients")
+            coef_df = pd.DataFrame(reg_result["coefficients"])
+            coef_label = "Coef (log)" if reg_result["model_type"] in ("logistic", "poisson") else "Coefficient"
+            coef_df.columns = ["Variable", coef_label, "Effect", "CI Lower", "CI Upper", "P-value", "SE"]
+            st.dataframe(coef_df, use_container_width=True, hide_index=True)
+
+            # Model fit metrics
+            st.markdown("### Model Fit")
+            fit_cols = st.columns(4)
+            with fit_cols[0]:
+                st.metric("AIC", f"{model_fit['aic']:.1f}")
+            with fit_cols[1]:
+                st.metric("BIC", f"{model_fit['bic']:.1f}")
+            with fit_cols[2]:
+                if "r_squared" in model_fit:
+                    st.metric("R²", f"{model_fit['r_squared']:.4f}")
+                else:
+                    st.metric("Pseudo R²", f"{model_fit['pseudo_r_squared']:.4f}")
+            with fit_cols[3]:
+                st.metric("N", f"{reg_result['n_observations']:,}")
+
+            if reg_result["n_dropped"] > 0:
+                st.caption(f"{reg_result['n_dropped']} rows dropped due to missing values.")
+
+            if not reg_result["converged"]:
+                st.warning("The model did not converge. Results may be unreliable.")
+
+            # Interpretation
+            with st.expander("Interpretation", expanded=True):
+                st.markdown(reg_result["interpretation"])

@@ -103,6 +103,7 @@
 - Reuses `stats_calculator` for OR, RR, RD, Chi-square on derived table
 - Mantel-Haenszel stratified analysis when confounders are assigned (adjusted OR/RR, Breslow-Day test)
 - E-value sensitivity analysis auto-computed from crude OR (and MH-adjusted OR when available)
+- Regression analysis tab: logistic (OR), linear (β), Poisson (IRR) via `core/regression.py`
 
 ### core/ (Business Logic)
 
@@ -219,6 +220,15 @@ def calculate_direct_standardized_rate(strata: list[dict], multiplier: int = 100
     #          total_standard_pop, total_events, total_population, crude_rate, multiplier
 ```
 
+#### regression.py
+```python
+def run_logistic_regression(df, outcome_col, exposure_col, confounder_cols, outcome_positive, exposure_positive=None) -> dict
+def run_linear_regression(df, outcome_col, exposure_col, confounder_cols, exposure_positive=None) -> dict
+def run_poisson_regression(df, outcome_col, exposure_col, confounder_cols, exposure_positive=None) -> dict
+    # All use sm.GLM uniformly. Returns: model_type, n_observations, n_dropped, converged,
+    # exposure_effect, coefficients, model_fit (AIC/BIC/R²), interpretation
+```
+
 #### e_value.py
 ```python
 def calculate_e_value(point_estimate: float, ci_bound: float = None) -> dict
@@ -239,6 +249,9 @@ def interpret_direct_standardized_rate(adjusted_rate: float, ci_lower: float, ci
 def interpret_smr(smr: float, ci_lower: float, ci_upper: float) -> str
 def interpret_meta_analysis(pooled: float, ci_lower: float, ci_upper: float, measure_type: str, model: str) -> str
 def interpret_mantel_haenszel(or_value: float, or_ci_lower: float, or_ci_upper: float, homogeneity_p: float | None, n_strata: int, confounder_name: str) -> str
+def interpret_logistic_regression(exposure_name, or_value, ci_lower, ci_upper, p_value, confounder_names, n_obs) -> str
+def interpret_linear_regression(exposure_name, beta, ci_lower, ci_upper, p_value, confounder_names, n_obs, r_squared) -> str
+def interpret_poisson_regression(exposure_name, irr, ci_lower, ci_upper, p_value, confounder_names, n_obs) -> str
 ```
 
 #### constants.py
@@ -410,6 +423,14 @@ RATE_MULTIPLIERS = {"per 1,000": 1000, "per 10,000": 10000, "per 100,000": 10000
                                                        │ (crude OR +     │
                                                        │  adjusted OR)   │
                                                        └─────────────────┘
+
+               ┌───────────────────────────────────────┤
+               ▼                                       │
+      ┌─────────────────┐                              │
+      │  Regression     │                              │
+      │  (logistic/     │ ◄────────── exposure + confounders
+      │  linear/Poisson)│
+      └─────────────────┘
 ```
 
 ## Session State Schema
@@ -476,6 +497,10 @@ st.session_state = {
     "data_confounder_cols": list[str],     # Selected confounder columns
     "data_outcome_positive": object,       # Positive outcome value
     "data_exposure_positive": object,      # Positive exposure value
+
+    # Regression Analysis (Data Analysis Tab 5)
+    "data_reg_model_type": str,            # Selected model: "Logistic (OR)" | "Linear (β)" | "Poisson (IRR)"
+    "data_reg_result": dict | None,        # Last regression result
 }
 ```
 
