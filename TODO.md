@@ -53,6 +53,13 @@
   - Source column ("regex"/"llm") in all display tabs and CSV export
   - Toggle auto-disabled when Ollama not running
 
+- [x] **Professional Repo Polish**
+  - GitHub description and topics set via `gh` CLI
+  - README badges (Python, Streamlit, License)
+  - Issue templates (bug report, feature request)
+  - Pull request template
+  - Copyright year updated to 2025-2026
+
 ## Known Limitations
 
 - **Paper Analyzer**

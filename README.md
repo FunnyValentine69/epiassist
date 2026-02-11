@@ -1,5 +1,9 @@
 # EpiAssist
 
+![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)
+![Streamlit](https://img.shields.io/badge/streamlit-1.28+-red.svg)
+![License](https://img.shields.io/badge/license-proprietary-orange.svg)
+
 An epidemiological research assistant for causal inference, statistical analysis, and literature review.
 
 ## Features
@@ -158,4 +162,4 @@ mypy core/ utils/
 
 ---
 
-Copyright © 2025 Rogue Semicolon. All rights reserved.
+Copyright © 2025-2026 Rogue Semicolon. All rights reserved.
