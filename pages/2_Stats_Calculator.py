@@ -11,19 +11,23 @@ from core.stats_calculator import (
     calculate_chi_square,
 )
 from core.smr_calculator import calculate_smr, calculate_smr_stratified
-from utils.constants import DEMO_2X2_TABLE
+from core.direct_standardization import calculate_direct_standardized_rate
+from utils.constants import DEMO_2X2_TABLE, STANDARD_POPULATIONS, RATE_MULTIPLIERS
 
 st.set_page_config(page_title="Statistics Calculator - EpiAssist", layout="wide")
 
 st.title("Statistics Calculator")
 st.markdown("""
-Calculate epidemiological measures from contingency tables (OR, RR, RD, Chi-square)
-or compute Standardized Mortality/Incidence Ratios (SMR/SIR).
+Calculate epidemiological measures from contingency tables (OR, RR, RD, Chi-square),
+compute Standardized Mortality/Incidence Ratios (SMR/SIR), or calculate directly
+standardized (age-adjusted) rates.
 """)
 
 st.divider()
 
-tab_2x2, tab_smr = st.tabs(["2x2 Table (OR/RR/RD)", "SMR/SIR Calculator"])
+tab_2x2, tab_smr, tab_direct = st.tabs([
+    "2x2 Table (OR/RR/RD)", "SMR/SIR Calculator", "Direct Standardization"
+])
 
 # ── Tab 1: 2x2 Table ──────────────────────────────────────────────────────
 with tab_2x2:
@@ -380,3 +384,99 @@ with tab_smr:
 
                 except (ValueError, KeyError) as e:
                     st.error(f"Calculation error: {e}")
+
+# ── Tab 3: Direct Standardization ─────────────────────────────────────────
+with tab_direct:
+    st.markdown("""
+    **Direct standardization** computes age-adjusted rates by applying your study's
+    stratum-specific rates to a standard population. This removes the effect of
+    differing age distributions and lets you compare rates across populations.
+    """)
+
+    col_opts, _ = st.columns([1, 1])
+    with col_opts:
+        std_pop_name = st.selectbox(
+            "Standard population",
+            list(STANDARD_POPULATIONS.keys()) + ["Custom"],
+            key="direct_std_pop",
+        )
+        multiplier_label = st.selectbox(
+            "Rate multiplier",
+            list(RATE_MULTIPLIERS.keys()),
+            index=2,  # default "per 100,000"
+            key="direct_multiplier",
+        )
+
+    # Build default DataFrame from selected standard population
+    if "direct_strata_df" not in st.session_state or st.session_state.get("_direct_last_pop") != std_pop_name:
+        if std_pop_name != "Custom":
+            pop = STANDARD_POPULATIONS[std_pop_name]
+            st.session_state.direct_strata_df = pd.DataFrame({
+                "Stratum": [s["stratum_name"] for s in pop],
+                "Events": [0] * len(pop),
+                "Population": [0] * len(pop),
+                "Standard Weight": [s["weight"] for s in pop],
+            })
+        else:
+            st.session_state.direct_strata_df = pd.DataFrame({
+                "Stratum": ["Group 1", "Group 2", "Group 3"],
+                "Events": [0, 0, 0],
+                "Population": [0, 0, 0],
+                "Standard Weight": [0, 0, 0],
+            })
+        st.session_state._direct_last_pop = std_pop_name
+
+    st.markdown("### Stratum Data")
+    edited_direct_df = st.data_editor(
+        st.session_state.direct_strata_df,
+        num_rows="dynamic",
+        key="direct_editor",
+    )
+
+    direct_calc_btn = st.button("Calculate Adjusted Rate", type="primary")
+
+    if direct_calc_btn or "direct_result" in st.session_state:
+        # NaN guard
+        if edited_direct_df[["Events", "Population", "Standard Weight"]].isna().any().any():
+            st.error("All rows must have values. Please fill in empty cells.")
+        else:
+            try:
+                strata = [
+                    {
+                        "stratum_name": row["Stratum"],
+                        "events": int(row["Events"]),
+                        "population": int(row["Population"]),
+                        "standard_weight": int(row["Standard Weight"]),
+                    }
+                    for _, row in edited_direct_df.iterrows()
+                ]
+
+                multiplier = RATE_MULTIPLIERS[multiplier_label]
+                result = calculate_direct_standardized_rate(strata, multiplier=multiplier)
+                st.session_state.direct_result = result
+
+                st.markdown("### Results")
+
+                col_adj, col_crude = st.columns(2)
+                with col_adj:
+                    st.metric(
+                        "Adjusted Rate",
+                        f"{result['value']:.2f}",
+                        f"95% CI: {result['ci_lower']:.2f}-{result['ci_upper']:.2f}",
+                    )
+                with col_crude:
+                    st.metric(
+                        "Crude Rate",
+                        f"{result['crude_rate']:.2f}",
+                        f"{multiplier_label}",
+                    )
+
+                with st.expander("Strata Breakdown"):
+                    breakdown = pd.DataFrame(result["strata_details"])
+                    st.dataframe(breakdown, use_container_width=True)
+
+                with st.expander("Interpretation", expanded=True):
+                    st.markdown(result["interpretation"])
+
+            except (ValueError, KeyError) as e:
+                st.error(f"Calculation error: {e}")

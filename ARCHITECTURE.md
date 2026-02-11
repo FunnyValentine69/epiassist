@@ -62,9 +62,10 @@
 - Export/import DAG functionality
 
 #### 2_Stats_Calculator.py
-- Tabbed layout: "2x2 Table (OR/RR/RD)" and "SMR/SIR Calculator"
+- Tabbed layout: "2x2 Table (OR/RR/RD)", "SMR/SIR Calculator", "Direct Standardization"
 - 2x2 contingency table input with OR, RR, RD, Chi-square
 - SMR/SIR: simple mode (observed/expected) or stratified mode (person-time + reference rates)
+- Direct standardization: age-adjusted rates with built-in standard populations (US 2000, WHO World, Segi World)
 - Confidence interval display
 - Natural language interpretations
 
@@ -208,6 +209,16 @@ def calculate_smr_stratified(strata: list[dict], ci_level: float = 0.95) -> dict
     # Returns: SMR result + strata_details, total_person_time
 ```
 
+#### direct_standardization.py
+```python
+def calculate_stratum_rates(strata: list[dict]) -> list[dict]
+    # Computes rate = events/population and weighted_events = rate * standard_weight
+def calculate_direct_standardized_rate(strata: list[dict], multiplier: int = 100_000, ci_level: float = 0.95) -> dict
+    # Direct standardization with Fay-Feuer CI (gamma distribution)
+    # Returns: value, ci_lower, ci_upper, interpretation, strata_details,
+    #          total_standard_pop, total_events, total_population, crude_rate, multiplier
+```
+
 #### e_value.py
 ```python
 def calculate_e_value(point_estimate: float, ci_bound: float = None) -> dict
@@ -224,6 +235,7 @@ def interpret_p_value(p: float, alpha: float = 0.05) -> str
 def interpret_power(power: float) -> str
 def interpret_e_value(e_value: float) -> str
 def interpret_heterogeneity(i_squared: float, q_p_value: float, num_studies: int) -> str
+def interpret_direct_standardized_rate(adjusted_rate: float, ci_lower: float, ci_upper: float, crude_rate: float, multiplier: int) -> str
 def interpret_smr(smr: float, ci_lower: float, ci_upper: float) -> str
 def interpret_meta_analysis(pooled: float, ci_lower: float, ci_upper: float, measure_type: str, model: str) -> str
 def interpret_mantel_haenszel(or_value: float, or_ci_lower: float, or_ci_upper: float, homogeneity_p: float | None, n_strata: int, confounder_name: str) -> str
@@ -253,6 +265,8 @@ I_SQUARED_THRESHOLDS = {"low": 25, "moderate": 50, "high": 75}
 RATIO_MEASURES = {"OR", "RR", "HR", "PR", "IRR"}
 DIFFERENCE_MEASURES = {"MD", "RD", "beta"}
 META_MEASURE_LABELS = {"OR": "Odds Ratio", ...}
+STANDARD_POPULATIONS = {"US 2000": [...], "WHO World": [...], "Segi World": [...]}
+RATE_MULTIPLIERS = {"per 1,000": 1000, "per 10,000": 10000, "per 100,000": 100000}
 ```
 
 ## Data Flow Diagrams
@@ -438,6 +452,12 @@ st.session_state = {
     "meta_results": dict | None,           # Full analysis results
     "meta_measure_type": str,              # Selected measure type
     "meta_model": str,                     # Selected model (fixed/random/both)
+
+    # Direct Standardization
+    "direct_std_pop": str,               # Selected standard population name
+    "direct_strata_df": pd.DataFrame,    # Editable strata table
+    "direct_result": dict | None,        # Calculation result
+    "direct_multiplier": str,            # Selected rate multiplier label
 
     # SMR/SIR Calculator
     "smr_mode": str,                     # "Simple (totals only)" or "Stratified ..."

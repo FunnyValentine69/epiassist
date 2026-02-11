@@ -371,6 +371,65 @@ def interpret_smr(smr: float, ci_lower: float, ci_upper: float) -> str:
     )
 
 
+def interpret_direct_standardized_rate(
+    adjusted_rate: float,
+    ci_lower: float,
+    ci_upper: float,
+    crude_rate: float,
+    multiplier: int,
+) -> str:
+    """Generate plain English interpretation of a directly standardized rate.
+
+    Args:
+        adjusted_rate: The age-adjusted rate (per multiplier).
+        ci_lower: Lower bound of 95% CI.
+        ci_upper: Upper bound of 95% CI.
+        crude_rate: The unadjusted crude rate (per multiplier).
+        multiplier: The rate multiplier (e.g. 100000 for "per 100,000").
+
+    Returns:
+        Plain English interpretation string.
+    """
+    multiplier_label = f"per {multiplier:,}"
+
+    # Compare adjusted to crude
+    if crude_rate < 1e-10:
+        comparison = (
+            "The crude rate is zero, so the adjusted rate reflects the "
+            "weighted contribution of stratum-specific rates to the standard population."
+        )
+    else:
+        pct_diff = ((adjusted_rate - crude_rate) / crude_rate) * 100
+        abs_pct = abs(pct_diff)
+
+        if abs_pct < 5:
+            comparison = (
+                f"The adjusted rate ({adjusted_rate:.2f}) is similar to the crude rate "
+                f"({crude_rate:.2f}), suggesting the age distribution of the study "
+                f"population is close to the standard population."
+            )
+        elif pct_diff > 0:
+            comparison = (
+                f"The adjusted rate ({adjusted_rate:.2f}) is {abs_pct:.0f}% higher than the "
+                f"crude rate ({crude_rate:.2f}), indicating that the study population "
+                f"has a younger age structure compared to the standard population."
+            )
+        else:
+            comparison = (
+                f"The adjusted rate ({adjusted_rate:.2f}) is {abs_pct:.0f}% lower than the "
+                f"crude rate ({crude_rate:.2f}), indicating that the study population "
+                f"has an older age structure compared to the standard population."
+            )
+
+    return (
+        f"Age-adjusted rate = {adjusted_rate:.2f} {multiplier_label} "
+        f"(95% CI: {ci_lower:.2f}-{ci_upper:.2f}). "
+        f"{comparison} "
+        f"This rate is comparable to other populations standardized "
+        f"to the same reference population."
+    )
+
+
 def interpret_meta_analysis(
     pooled: float,
     ci_lower: float,

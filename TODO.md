@@ -116,7 +116,7 @@
 - [x] Mantel-Haenszel adjusted OR/RR
 - [x] E-value calculator (unmeasured confounding) — auto-computed from crude/adjusted OR in Data Analysis Tab 4
 - [x] SMR/SIR calculator (standardized ratios)
-- [ ] Direct/indirect standardization
+- [x] Direct/indirect standardization
 
 ## Phase 2.2: Regression Analysis (Planned)
 - [ ] Logistic regression → adjusted ORs

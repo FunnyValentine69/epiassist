@@ -39,6 +39,7 @@ epiassist/
 ├── core/                     # Business logic modules
 │   ├── dag_engine.py
 │   ├── stats_calculator.py   # OR, RR, RD, Chi-square, Mantel-Haenszel
+│   ├── direct_standardization.py  # Direct standardization (Fay-Feuer CI)
 │   ├── confounder_detector.py
 │   ├── paper_parser.py
 │   ├── llm_extractor.py      # Optional LLM extraction (LangExtract + Ollama)
@@ -46,6 +47,7 @@ epiassist/
 │   ├── e_value.py            # E-value sensitivity analysis (used by pages 5 & 7)
 │   ├── meta_analysis.py      # Meta-analysis pooling (fixed/random effects)
 │   ├── smr_calculator.py     # SMR/SIR calculator (exact Poisson CI)
+│   ├── direct_standardization.py  # Direct standardization (age-adjusted rates, Fay-Feuer CI)
 │   └── data_analyzer.py      # Data upload, summary, contingency tables
 ├── utils/
 │   ├── interpretations.py
@@ -77,7 +79,7 @@ All statistical functions must return a dict with this structure:
 ### Session State
 
 - Use `st.session_state` for all cross-page persistence
-- Prefix keys by feature: `dag_`, `stats_`, `hypo_`, `paper_`, `power_`, `meta_`, `data_`, `smr_`
+- Prefix keys by feature: `dag_`, `stats_`, `hypo_`, `paper_`, `power_`, `meta_`, `data_`, `smr_`, `direct_`
 
 ### Natural Language Interpretations
 

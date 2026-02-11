@@ -75,3 +75,51 @@ DEMO_DAG_EDGES: list[tuple[str, str]] = [
     ("Other Disabilities", "Unemployment"),
     ("Hearing Loss", "Unemployment"),
 ]
+
+# Standard populations for direct standardization
+# Weights represent the standard population count in each age group.
+STANDARD_POPULATIONS: dict[str, list[dict]] = {
+    "US 2000": [
+        {"stratum_name": "0-4", "weight": 18987},
+        {"stratum_name": "5-14", "weight": 39977},
+        {"stratum_name": "15-24", "weight": 38077},
+        {"stratum_name": "25-34", "weight": 37233},
+        {"stratum_name": "35-44", "weight": 44659},
+        {"stratum_name": "45-54", "weight": 37030},
+        {"stratum_name": "55-64", "weight": 23961},
+        {"stratum_name": "65-74", "weight": 18136},
+        {"stratum_name": "75-84", "weight": 12315},
+        {"stratum_name": "85+", "weight": 4259},
+    ],
+    "WHO World": [
+        {"stratum_name": "0-4", "weight": 8860},
+        {"stratum_name": "5-14", "weight": 17020},
+        {"stratum_name": "15-24", "weight": 17020},
+        {"stratum_name": "25-34", "weight": 15020},
+        {"stratum_name": "35-44", "weight": 12170},
+        {"stratum_name": "45-54", "weight": 9610},
+        {"stratum_name": "55-64", "weight": 7150},
+        {"stratum_name": "65-74", "weight": 5410},
+        {"stratum_name": "75-84", "weight": 3520},
+        {"stratum_name": "85+", "weight": 1520},
+    ],
+    "Segi World": [
+        {"stratum_name": "0-4", "weight": 12000},
+        {"stratum_name": "5-14", "weight": 18000},
+        {"stratum_name": "15-24", "weight": 17000},
+        {"stratum_name": "25-34", "weight": 14000},
+        {"stratum_name": "35-44", "weight": 12000},
+        {"stratum_name": "45-54", "weight": 9000},
+        {"stratum_name": "55-64", "weight": 6000},
+        {"stratum_name": "65-74", "weight": 4000},
+        {"stratum_name": "75-84", "weight": 2000},
+        {"stratum_name": "85+", "weight": 1000},
+    ],
+}
+
+# Rate multipliers for direct standardization output
+RATE_MULTIPLIERS: dict[str, int] = {
+    "per 1,000": 1_000,
+    "per 10,000": 10_000,
+    "per 100,000": 100_000,
+}
