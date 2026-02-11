@@ -496,6 +496,7 @@ def interpret_logistic_regression(
     p_value: float,
     confounder_names: list[str],
     n_obs: int,
+    weighted: bool = False,
 ) -> str:
     """Generate plain English interpretation of logistic regression results.
 
@@ -526,8 +527,10 @@ def interpret_logistic_regression(
     else:
         adj_text = "unadjusted (no confounders)"
 
+    prefix = "Survey-weighted adjusted" if weighted else "Adjusted"
+
     return (
-        f"Adjusted OR = {or_value:.2f} (95% CI: {ci_lower:.2f}-{ci_upper:.2f}, "
+        f"{prefix} OR = {or_value:.2f} (95% CI: {ci_lower:.2f}-{ci_upper:.2f}, "
         f"p {p_str}), {adj_text}, based on {n_obs:,} observations. "
         f"Exposure to {exposure_name} is associated with {direction} "
         f"of the outcome. This association is {sig}."
@@ -543,6 +546,7 @@ def interpret_linear_regression(
     confounder_names: list[str],
     n_obs: int,
     r_squared: float,
+    weighted: bool = False,
 ) -> str:
     """Generate plain English interpretation of linear regression results.
 
@@ -574,8 +578,10 @@ def interpret_linear_regression(
     else:
         adj_text = "unadjusted (no confounders)"
 
+    prefix = "Survey-weighted adjusted" if weighted else "Adjusted"
+
     return (
-        f"Adjusted β = {beta:.2f} (95% CI: {ci_lower:.2f}-{ci_upper:.2f}, "
+        f"{prefix} β = {beta:.2f} (95% CI: {ci_lower:.2f}-{ci_upper:.2f}, "
         f"p {p_str}), {adj_text}, based on {n_obs:,} observations. "
         f"A one-unit increase in {exposure_name} is associated with {direction} "
         f"in the outcome. This association is {sig}. "
@@ -591,6 +597,7 @@ def interpret_poisson_regression(
     p_value: float,
     confounder_names: list[str],
     n_obs: int,
+    weighted: bool = False,
 ) -> str:
     """Generate plain English interpretation of Poisson regression results.
 
@@ -621,8 +628,10 @@ def interpret_poisson_regression(
     else:
         adj_text = "unadjusted (no confounders)"
 
+    prefix = "Survey-weighted adjusted" if weighted else "Adjusted"
+
     return (
-        f"Adjusted IRR = {irr:.2f} (95% CI: {ci_lower:.2f}-{ci_upper:.2f}, "
+        f"{prefix} IRR = {irr:.2f} (95% CI: {ci_lower:.2f}-{ci_upper:.2f}, "
         f"p {p_str}), {adj_text}, based on {n_obs:,} observations. "
         f"Exposure to {exposure_name} is associated with {direction} "
         f"of the outcome. This association is {sig}."

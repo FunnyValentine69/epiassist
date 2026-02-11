@@ -80,7 +80,7 @@ All statistical functions must return a dict with this structure:
 ### Session State
 
 - Use `st.session_state` for all cross-page persistence
-- Prefix keys by feature: `dag_`, `stats_`, `hypo_`, `paper_`, `power_`, `meta_`, `data_`, `smr_`, `direct_`, `data_reg_`
+- Prefix keys by feature: `dag_`, `stats_`, `hypo_`, `paper_`, `power_`, `meta_`, `data_`, `smr_`, `direct_`, `data_reg_`, `data_weight_col`
 
 ### Natural Language Interpretations
 

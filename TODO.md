@@ -125,9 +125,13 @@
 - [x] Data Analysis Tab 5 with model selection, coefficient tables, model fit stats
 - [x] 22 tests across 6 classes covering data prep, all 3 models, and interpretations
 
-## Phase 2.3: Survey-Weighted Analysis (Planned)
-- [ ] Weighted means/proportions
-- [ ] Weighted regression with user-provided weight column
+## Phase 2.3: Survey-Weighted Analysis (Complete)
+- [x] Weighted means/proportions (weighted_stats_numeric, weighted_stats_categorical, grouped_weighted)
+- [x] Weighted regression with user-provided weight column (freq_weights via GLM)
+- [x] Weight column role assignment in Data Analysis Tab 2 with validation (> 0)
+- [x] Weighted descriptive stats in Tab 3 with info banner and effective N (Kish's formula)
+- [x] Survey-weighted interpretation prefix in regression output
+- [x] 19 new tests (9 data_analyzer + 10 regression weighted tests)
 
 ## Phase 3: Integration (Future)
 - [ ] DAG → auto-suggest confounders for regression

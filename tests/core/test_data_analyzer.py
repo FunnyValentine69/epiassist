@@ -11,8 +11,11 @@ from core.data_analyzer import (
     descriptive_stats_categorical,
     descriptive_stats_numeric,
     grouped_descriptive_stats,
+    grouped_weighted_descriptive_stats,
     load_data,
     summarize_columns,
+    weighted_stats_categorical,
+    weighted_stats_numeric,
 )
 
 
@@ -226,6 +229,150 @@ class TestGroupedDescriptiveStats:
         result = grouped_descriptive_stats(SAMPLE_DF, "age", "hearing_loss")
         expected_keys = set(SAMPLE_DF["hearing_loss"].unique())
         assert set(result.keys()) == expected_keys
+
+
+# ============================================================
+# TestWeightedStatsNumeric
+# ============================================================
+
+class TestWeightedStatsNumeric:
+    """Tests for weighted_stats_numeric function."""
+
+    def test_uniform_weights_match_unweighted(self):
+        """Uniform weights should give approximately the same mean as unweighted."""
+        series = pd.Series([2.0, 4.0, 6.0, 8.0, 10.0])
+        weights = pd.Series([1.0, 1.0, 1.0, 1.0, 1.0])
+        stats = weighted_stats_numeric(series, weights)
+        assert stats["n"] == 5
+        assert abs(stats["mean"] - 6.0) < 0.01
+
+    def test_heavy_weight_shifts_mean(self):
+        """A heavy weight on one observation shifts the mean toward it."""
+        series = pd.Series([1.0, 10.0])
+        weights = pd.Series([1.0, 100.0])
+        stats = weighted_stats_numeric(series, weights)
+        # Mean should be much closer to 10 than 1
+        assert stats["mean"] > 9.0
+
+    def test_nan_excluded(self):
+        """NaN in series or weights is excluded."""
+        series = pd.Series([1.0, 2.0, np.nan, 4.0])
+        weights = pd.Series([1.0, np.nan, 1.0, 1.0])
+        stats = weighted_stats_numeric(series, weights)
+        # Only rows where both are non-NaN: rows 0 and 3
+        assert stats["n"] == 2
+
+    def test_empty_series_returns_zero(self):
+        """Empty series returns n=0."""
+        series = pd.Series([], dtype=float)
+        weights = pd.Series([], dtype=float)
+        stats = weighted_stats_numeric(series, weights)
+        assert stats["n"] == 0
+        assert stats["mean"] is None
+
+    def test_effective_n_computed(self):
+        """Effective N uses Kish's formula."""
+        series = pd.Series([1.0, 2.0, 3.0])
+        weights = pd.Series([1.0, 1.0, 1.0])
+        stats = weighted_stats_numeric(series, weights)
+        # Uniform weights: effective_n = (3)^2 / 3 = 3.0
+        assert abs(stats["effective_n"] - 3.0) < 0.1
+
+    def test_single_observation(self):
+        """Single observation returns n=1, sd=0.0, correct mean."""
+        series = pd.Series([7.5])
+        weights = pd.Series([2.0])
+        stats = weighted_stats_numeric(series, weights)
+        assert stats["n"] == 1
+        assert stats["mean"] == 7.5
+        assert stats["sd"] == 0.0
+        assert stats["effective_n"] == 1.0
+
+    def test_effective_n_unequal_weights(self):
+        """Highly unequal weights produce effective_n much less than n."""
+        series = pd.Series([1.0, 2.0, 3.0, 4.0])
+        weights = pd.Series([100.0, 1.0, 1.0, 1.0])
+        stats = weighted_stats_numeric(series, weights)
+        # Kish: (103)^2 / (10000+1+1+1) ~ 1.06
+        assert stats["effective_n"] < 2.0
+        assert stats["n"] == 4
+
+
+# ============================================================
+# TestWeightedStatsCategorical
+# ============================================================
+
+class TestWeightedStatsCategorical:
+    """Tests for weighted_stats_categorical function."""
+
+    def test_uniform_weights_match_unweighted(self):
+        """Uniform weights produce proportions matching unweighted."""
+        series = pd.Series(["A", "B", "A", "A", "B"])
+        weights = pd.Series([1.0, 1.0, 1.0, 1.0, 1.0])
+        stats = weighted_stats_categorical(series, weights)
+        # A: 3/5 = 0.6, B: 2/5 = 0.4
+        a_cat = next(c for c in stats["categories"] if c["value"] == "A")
+        assert abs(a_cat["proportion"] - 0.6) < 0.01
+
+    def test_weighted_proportions_correct(self):
+        """Weighted proportions computed correctly with known weights."""
+        series = pd.Series(["A", "B"])
+        weights = pd.Series([3.0, 1.0])
+        stats = weighted_stats_categorical(series, weights)
+        # A: 3/4 = 0.75, B: 1/4 = 0.25
+        a_cat = next(c for c in stats["categories"] if c["value"] == "A")
+        assert abs(a_cat["proportion"] - 0.75) < 0.01
+
+    def test_nan_excluded(self):
+        """NaN in series or weights is excluded from proportions."""
+        series = pd.Series(["A", "B", None, "A", "B"])
+        weights = pd.Series([1.0, np.nan, 1.0, 2.0, 1.0])
+        stats = weighted_stats_categorical(series, weights)
+        # Valid rows: 0 (A,1.0), 3 (A,2.0), 4 (B,1.0) → n_missing includes NaN from both
+        assert stats["n_missing"] > 0
+        total_prop = sum(c["proportion"] for c in stats["categories"])
+        assert abs(total_prop - 1.0) < 0.01
+
+    def test_proportions_sum_to_one(self):
+        """Weighted proportions sum to 1.0 with multiple categories."""
+        series = pd.Series(["X", "Y", "Z", "X", "Y", "Z", "X"])
+        weights = pd.Series([2.0, 3.0, 1.0, 4.0, 1.0, 5.0, 2.0])
+        stats = weighted_stats_categorical(series, weights)
+        total_prop = sum(c["proportion"] for c in stats["categories"])
+        assert abs(total_prop - 1.0) < 0.01
+
+
+# ============================================================
+# TestGroupedWeightedDescriptiveStats
+# ============================================================
+
+class TestGroupedWeightedDescriptiveStats:
+    """Tests for grouped_weighted_descriptive_stats function."""
+
+    def test_correct_group_keys(self):
+        """Returns correct group keys from the grouping variable."""
+        df = SAMPLE_DF.copy()
+        df["weight"] = 1.0
+        result = grouped_weighted_descriptive_stats(df, "age", "hearing_loss", "weight")
+        assert "Yes" in result
+        assert "No" in result
+
+    def test_numeric_gets_weighted_stats(self):
+        """Numeric variable gets weighted stats with effective_n."""
+        df = SAMPLE_DF.copy()
+        df["weight"] = np.random.default_rng(42).uniform(0.5, 5.0, size=len(df))
+        result = grouped_weighted_descriptive_stats(df, "age", "hearing_loss", "weight")
+        # Should have weighted numeric stats
+        assert "mean" in result["Yes"]
+        assert "effective_n" in result["Yes"]
+
+    def test_categorical_gets_weighted_stats(self):
+        """Categorical variable gets weighted categorical stats per group."""
+        df = SAMPLE_DF.copy()
+        df["weight"] = 1.0
+        result = grouped_weighted_descriptive_stats(df, "education", "hearing_loss", "weight")
+        assert "Yes" in result
+        assert "categories" in result["Yes"]
 
 
 # ============================================================

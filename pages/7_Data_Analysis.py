@@ -9,8 +9,11 @@ from core.data_analyzer import (
     descriptive_stats_categorical,
     descriptive_stats_numeric,
     grouped_descriptive_stats,
+    grouped_weighted_descriptive_stats,
     load_data,
     summarize_columns,
+    weighted_stats_categorical,
+    weighted_stats_numeric,
 )
 from core.e_value import calculate_e_value_for_or
 from core.regression import (
@@ -94,7 +97,8 @@ with tab1:
         st.session_state.data_col_summary = summarize_columns(df)
         for key in ["data_outcome_col", "data_outcome_positive",
                      "data_exposure_col", "data_exposure_positive",
-                     "data_confounder_cols"]:
+                     "data_confounder_cols", "data_weight_col",
+                     "data_reg_result"]:
             st.session_state.pop(key, None)
 
     # Clear button
@@ -194,13 +198,41 @@ with tab2:
             # Confounders
             remaining = [c for c in all_columns
                          if c != st.session_state.get("data_outcome_col")
-                         and c != st.session_state.get("data_exposure_col")]
+                         and c != st.session_state.get("data_exposure_col")
+                         and c != st.session_state.get("data_weight_col")]
             confounder_cols = st.multiselect(
                 "Confounder variables (optional)",
                 remaining,
                 key="data_confounder_cols_select",
             )
             st.session_state.data_confounder_cols = confounder_cols
+
+            # Weight column (survey weights)
+            numeric_cols = [c for c in all_columns
+                           if pd.api.types.is_numeric_dtype(df_roles[c])
+                           and c != st.session_state.get("data_outcome_col")
+                           and c != st.session_state.get("data_exposure_col")
+                           and c not in confounder_cols]
+            weight_col = st.selectbox(
+                "Weight column (optional — survey weights)",
+                ["(none)"] + numeric_cols,
+                key="data_weight_col_select",
+            )
+            if weight_col != "(none)":
+                # Validate all non-null values are > 0
+                weight_series = df_roles[weight_col].dropna()
+                if (weight_series <= 0).any():
+                    st.error("Weight column must contain only positive (> 0) values.")
+                    st.session_state.pop("data_weight_col", None)
+                else:
+                    # Clear stale regression result when weight changes
+                    if st.session_state.get("data_weight_col") != weight_col:
+                        st.session_state.pop("data_reg_result", None)
+                    st.session_state.data_weight_col = weight_col
+            else:
+                if "data_weight_col" in st.session_state:
+                    st.session_state.pop("data_reg_result", None)
+                st.session_state.pop("data_weight_col", None)
 
         with col_right:
             st.markdown("### Variable Preview")
@@ -221,6 +253,13 @@ with tab2:
             if confounder_cols:
                 st.markdown(f"**Confounders:** {', '.join(confounder_cols)}")
 
+            if "data_weight_col" in st.session_state:
+                wc = st.session_state.data_weight_col
+                w_series = df_roles[wc].dropna()
+                st.markdown(f"**Weight column:** {wc}")
+                st.write(f"- Range: {w_series.min():.2f} - {w_series.max():.2f}")
+                st.write(f"- Mean: {w_series.mean():.2f}")
+
 
 # --- Tab 3: Descriptive Statistics ---
 with tab3:
@@ -229,17 +268,35 @@ with tab3:
     else:
         df_desc = st.session_state.data_df
         col_summary = st.session_state.data_col_summary
+        desc_weight_col = st.session_state.get("data_weight_col")
+
+        if desc_weight_col:
+            st.info(
+                "**Survey-weighted statistics enabled.** Weights are treated as "
+                "frequency weights (observation replication). Point estimates are "
+                "correct but standard errors do not account for complex survey "
+                "design effects (strata, PSUs)."
+            )
 
         for s in col_summary:
             col_name = s["column"]
             series = df_desc[col_name]
+
+            # Skip weight column itself in descriptive stats
+            if col_name == desc_weight_col:
+                continue
 
             with st.expander(f"**{col_name}** ({s['type']})", expanded=False):
                 if s["type"] == "numeric":
                     # Check if exposure is assigned for grouped stats
                     if "data_exposure_col" in st.session_state:
                         exp_col = st.session_state.data_exposure_col
-                        grouped = grouped_descriptive_stats(df_desc, col_name, exp_col)
+                        if desc_weight_col:
+                            grouped = grouped_weighted_descriptive_stats(
+                                df_desc, col_name, exp_col, desc_weight_col
+                            )
+                        else:
+                            grouped = grouped_descriptive_stats(df_desc, col_name, exp_col)
 
                         # Side-by-side
                         cols = st.columns(len(grouped))
@@ -248,6 +305,8 @@ with tab3:
                                 st.markdown(f"**{exp_col} = {group}**")
                                 if "mean" in stats:
                                     st.dataframe(_numeric_stats_df(stats), hide_index=True)
+                                    if "effective_n" in stats and stats["effective_n"] is not None:
+                                        st.caption(f"Eff. N = {stats['effective_n']}")
 
                         # Histogram overlaid by exposure group
                         fig = go.Figure()
@@ -267,8 +326,13 @@ with tab3:
                         )
                         st.plotly_chart(fig, use_container_width=True)
                     else:
-                        stats = descriptive_stats_numeric(series)
+                        if desc_weight_col:
+                            stats = weighted_stats_numeric(series, df_desc[desc_weight_col])
+                        else:
+                            stats = descriptive_stats_numeric(series)
                         st.dataframe(_numeric_stats_df(stats), hide_index=True)
+                        if "effective_n" in stats and stats["effective_n"] is not None:
+                            st.caption(f"Eff. N = {stats['effective_n']}")
 
                         # Simple histogram
                         fig = go.Figure(go.Histogram(x=series.dropna()))
@@ -281,7 +345,10 @@ with tab3:
                         st.plotly_chart(fig, use_container_width=True)
                 else:
                     # Categorical: frequency table
-                    stats = descriptive_stats_categorical(series)
+                    if desc_weight_col:
+                        stats = weighted_stats_categorical(series, df_desc[desc_weight_col])
+                    else:
+                        stats = descriptive_stats_categorical(series)
                     freq_df = pd.DataFrame(stats["categories"])
                     if not freq_df.empty:
                         freq_df.columns = ["Value", "Count", "Proportion"]
@@ -667,6 +734,7 @@ with tab5:
         reg_confounders = st.session_state.get("data_confounder_cols", [])
         reg_outcome_pos = st.session_state.get("data_outcome_positive")
         reg_exposure_pos = st.session_state.get("data_exposure_positive")
+        reg_weight_col = st.session_state.get("data_weight_col")
 
         # Model type selection
         reg_model_type = st.radio(
@@ -685,10 +753,12 @@ with tab5:
 
         # Info box showing variable assignments
         conf_text = ", ".join(reg_confounders) if reg_confounders else "None"
+        weight_text = reg_weight_col if reg_weight_col else "None"
         st.info(
             f"**Outcome:** {reg_outcome}  \n"
             f"**Exposure:** {reg_exposure}  \n"
-            f"**Confounders:** {conf_text}"
+            f"**Confounders:** {conf_text}  \n"
+            f"**Weights:** {weight_text}"
         )
 
         # Model-specific validation messages
@@ -702,20 +772,20 @@ with tab5:
                         df_reg, reg_outcome, reg_exposure, reg_confounders,
                         outcome_positive=reg_outcome_pos,
                         exposure_positive=reg_exposure_pos,
+                        weight_col=reg_weight_col,
                     )
-                    effect_label = "Adjusted OR"
                 elif reg_model_type == "Linear (β)":
                     reg_result = run_linear_regression(
                         df_reg, reg_outcome, reg_exposure, reg_confounders,
                         exposure_positive=reg_exposure_pos,
+                        weight_col=reg_weight_col,
                     )
-                    effect_label = "Adjusted β"
                 else:
                     reg_result = run_poisson_regression(
                         df_reg, reg_outcome, reg_exposure, reg_confounders,
                         exposure_positive=reg_exposure_pos,
+                        weight_col=reg_weight_col,
                     )
-                    effect_label = "Adjusted IRR"
 
                 st.session_state.data_reg_result = reg_result
 
@@ -730,13 +800,14 @@ with tab5:
             exp_eff = reg_result["exposure_effect"]
             model_fit = reg_result["model_fit"]
 
-            # Effect label based on model type
+            # Effect label based on model type and weighting
+            weighted_prefix = "Survey-weighted adjusted" if reg_result.get("weighted") else "Adjusted"
             if reg_result["model_type"] == "logistic":
-                effect_label = "Adjusted OR"
+                effect_label = f"{weighted_prefix} OR"
             elif reg_result["model_type"] == "linear":
-                effect_label = "Adjusted β"
+                effect_label = f"{weighted_prefix} β"
             else:
-                effect_label = "Adjusted IRR"
+                effect_label = f"{weighted_prefix} IRR"
 
             # Primary result metric
             st.markdown("### Exposure Effect")

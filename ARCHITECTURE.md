@@ -104,6 +104,7 @@
 - Mantel-Haenszel stratified analysis when confounders are assigned (adjusted OR/RR, Breslow-Day test)
 - E-value sensitivity analysis auto-computed from crude OR (and MH-adjusted OR when available)
 - Regression analysis tab: logistic (OR), linear (β), Poisson (IRR) via `core/regression.py`
+- Survey-weighted analysis: optional weight column for weighted descriptive stats (Tab 3) and weighted regression (Tab 5) using `freq_weights`
 
 ### core/ (Business Logic)
 
@@ -194,6 +195,12 @@ def summarize_columns(df: pd.DataFrame) -> list[dict]
 def descriptive_stats_numeric(series: pd.Series) -> dict
 def descriptive_stats_categorical(series: pd.Series) -> dict
 def grouped_descriptive_stats(df: pd.DataFrame, variable: str, group_by: str) -> dict
+def weighted_stats_numeric(series: pd.Series, weights: pd.Series) -> dict
+    # Weighted mean/sd/quantiles via DescrStatsW + Kish's effective_n
+def weighted_stats_categorical(series: pd.Series, weights: pd.Series) -> dict
+    # Weighted proportions (sum weights per category)
+def grouped_weighted_descriptive_stats(df: pd.DataFrame, variable: str, group_by: str, weight_col: str) -> dict
+    # Grouped analog of weighted_stats_numeric/categorical
 def build_contingency_table(df: pd.DataFrame, outcome_col: str, exposure_col: str, outcome_positive: object, exposure_positive: object) -> dict
 ```
 
@@ -222,10 +229,11 @@ def calculate_direct_standardized_rate(strata: list[dict], multiplier: int = 100
 
 #### regression.py
 ```python
-def run_logistic_regression(df, outcome_col, exposure_col, confounder_cols, outcome_positive, exposure_positive=None) -> dict
-def run_linear_regression(df, outcome_col, exposure_col, confounder_cols, exposure_positive=None) -> dict
-def run_poisson_regression(df, outcome_col, exposure_col, confounder_cols, exposure_positive=None) -> dict
-    # All use sm.GLM uniformly. Returns: model_type, n_observations, n_dropped, converged,
+def run_logistic_regression(df, outcome_col, exposure_col, confounder_cols, outcome_positive, exposure_positive=None, weight_col=None) -> dict
+def run_linear_regression(df, outcome_col, exposure_col, confounder_cols, exposure_positive=None, weight_col=None) -> dict
+def run_poisson_regression(df, outcome_col, exposure_col, confounder_cols, exposure_positive=None, weight_col=None) -> dict
+    # All use sm.GLM uniformly (freq_weights when weight_col provided).
+    # Returns: model_type, weighted, n_observations, n_dropped, converged,
     # exposure_effect, coefficients, model_fit (AIC/BIC/R²), interpretation
 ```
 
@@ -249,9 +257,9 @@ def interpret_direct_standardized_rate(adjusted_rate: float, ci_lower: float, ci
 def interpret_smr(smr: float, ci_lower: float, ci_upper: float) -> str
 def interpret_meta_analysis(pooled: float, ci_lower: float, ci_upper: float, measure_type: str, model: str) -> str
 def interpret_mantel_haenszel(or_value: float, or_ci_lower: float, or_ci_upper: float, homogeneity_p: float | None, n_strata: int, confounder_name: str) -> str
-def interpret_logistic_regression(exposure_name, or_value, ci_lower, ci_upper, p_value, confounder_names, n_obs) -> str
-def interpret_linear_regression(exposure_name, beta, ci_lower, ci_upper, p_value, confounder_names, n_obs, r_squared) -> str
-def interpret_poisson_regression(exposure_name, irr, ci_lower, ci_upper, p_value, confounder_names, n_obs) -> str
+def interpret_logistic_regression(exposure_name, or_value, ci_lower, ci_upper, p_value, confounder_names, n_obs, weighted=False) -> str
+def interpret_linear_regression(exposure_name, beta, ci_lower, ci_upper, p_value, confounder_names, n_obs, r_squared, weighted=False) -> str
+def interpret_poisson_regression(exposure_name, irr, ci_lower, ci_upper, p_value, confounder_names, n_obs, weighted=False) -> str
 ```
 
 #### constants.py
@@ -497,6 +505,7 @@ st.session_state = {
     "data_confounder_cols": list[str],     # Selected confounder columns
     "data_outcome_positive": object,       # Positive outcome value
     "data_exposure_positive": object,      # Positive exposure value
+    "data_weight_col": str | None,         # Survey weight column (optional)
 
     # Regression Analysis (Data Analysis Tab 5)
     "data_reg_model_type": str,            # Selected model: "Logistic (OR)" | "Linear (β)" | "Poisson (IRR)"

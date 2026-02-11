@@ -66,7 +66,7 @@ class TestPrepareRegressionData:
         df = DF.copy()
         df.loc[0, "age"] = np.nan
         df.loc[1, "exposure"] = np.nan
-        y, X, _ = _prepare_regression_data(
+        y, X, _, _ = _prepare_regression_data(
             df, "blood_pressure", "exposure", ["age"],
             exposure_positive="Yes",
         )
@@ -74,7 +74,7 @@ class TestPrepareRegressionData:
 
     def test_categorical_confounders_get_dummies(self):
         """Categorical confounders are encoded as dummy variables."""
-        y, X, feature_names = _prepare_regression_data(
+        y, X, feature_names, _ = _prepare_regression_data(
             DF, "blood_pressure", "exposure", ["education"],
             exposure_positive="Yes",
         )
@@ -84,7 +84,7 @@ class TestPrepareRegressionData:
 
     def test_exposure_binarized(self):
         """Exposure is binarized when exposure_positive is given."""
-        y, X, feature_names = _prepare_regression_data(
+        y, X, feature_names, _ = _prepare_regression_data(
             DF, "blood_pressure", "exposure", [],
             exposure_positive="Yes",
         )
@@ -95,7 +95,7 @@ class TestPrepareRegressionData:
 
     def test_continuous_exposure_passed_through(self):
         """Numeric exposure with >10 unique values is not binarized."""
-        y, X, feature_names = _prepare_regression_data(
+        y, X, feature_names, _ = _prepare_regression_data(
             DF, "blood_pressure", "age", [],
         )
         assert "age" in feature_names
@@ -103,11 +103,46 @@ class TestPrepareRegressionData:
 
     def test_constant_column_added(self):
         """X matrix contains a constant column."""
-        y, X, _ = _prepare_regression_data(
+        y, X, _, _ = _prepare_regression_data(
             DF, "blood_pressure", "exposure", [],
             exposure_positive="Yes",
         )
         assert "const" in X.columns
+
+    def test_weight_col_nan_drops_row(self):
+        """NaN in weight column causes that row to be dropped."""
+        df = DF.copy()
+        df["weight"] = 1.0
+        df.loc[0, "weight"] = np.nan
+        df.loc[1, "weight"] = np.nan
+        y, X, _, weights = _prepare_regression_data(
+            df, "blood_pressure", "exposure", [],
+            exposure_positive="Yes",
+            weight_col="weight",
+        )
+        assert len(y) == len(DF) - 2
+        assert weights is not None
+        assert len(weights) == len(y)
+
+    def test_weight_col_returned_aligned(self):
+        """Returned weights have same length as y."""
+        df = DF.copy()
+        df["weight"] = np.random.default_rng(42).uniform(0.5, 5.0, size=len(df))
+        y, X, _, weights = _prepare_regression_data(
+            df, "blood_pressure", "exposure", [],
+            exposure_positive="Yes",
+            weight_col="weight",
+        )
+        assert weights is not None
+        assert len(weights) == len(y)
+
+    def test_no_weight_col_returns_none(self):
+        """When weight_col is None, fourth return element is None."""
+        _, _, _, weights = _prepare_regression_data(
+            DF, "blood_pressure", "exposure", [],
+            exposure_positive="Yes",
+        )
+        assert weights is None
 
 
 # ── TestRunLogisticRegression ──────────────────────────────────────────────
@@ -171,6 +206,31 @@ class TestRunLogisticRegression:
                 exposure_positive="Yes",
             )
 
+    def test_weighted_regression(self):
+        """Weighted logistic regression returns weighted=True."""
+        df = DF.copy()
+        df["weight"] = np.random.default_rng(42).uniform(0.5, 5.0, size=len(df))
+        result = run_logistic_regression(
+            df, "disease", "exposure", ["age"],
+            outcome_positive="1",
+            exposure_positive="Yes",
+            weight_col="weight",
+        )
+        assert result["weighted"] is True
+        assert result["exposure_effect"]["effect"] > 0
+
+    def test_weighted_interpretation_mentions_survey(self):
+        """Weighted logistic regression interpretation says 'survey-weighted'."""
+        df = DF.copy()
+        df["weight"] = np.random.default_rng(42).uniform(0.5, 5.0, size=len(df))
+        result = run_logistic_regression(
+            df, "disease", "exposure", ["age"],
+            outcome_positive="1",
+            exposure_positive="Yes",
+            weight_col="weight",
+        )
+        assert "survey-weighted" in result["interpretation"].lower()
+
 
 # ── TestRunLinearRegression ────────────────────────────────────────────────
 
@@ -211,6 +271,28 @@ class TestRunLinearRegression:
         )
         assert result["model_type"] == "linear"
         assert result["exposure_effect"]["variable"] == "age"
+
+    def test_weighted_regression(self):
+        """Weighted linear regression returns weighted=True."""
+        df = DF.copy()
+        df["weight"] = np.random.default_rng(42).uniform(0.5, 5.0, size=len(df))
+        result = run_linear_regression(
+            df, "blood_pressure", "exposure", ["age"],
+            exposure_positive="Yes",
+            weight_col="weight",
+        )
+        assert result["weighted"] is True
+
+    def test_weighted_interpretation_mentions_survey(self):
+        """Weighted linear regression interpretation says 'survey-weighted'."""
+        df = DF.copy()
+        df["weight"] = np.random.default_rng(42).uniform(0.5, 5.0, size=len(df))
+        result = run_linear_regression(
+            df, "blood_pressure", "exposure", ["age"],
+            exposure_positive="Yes",
+            weight_col="weight",
+        )
+        assert "survey-weighted" in result["interpretation"].lower()
 
 
 # ── TestRunPoissonRegression ───────────────────────────────────────────────
@@ -255,6 +337,28 @@ class TestRunPoissonRegression:
             exposure_positive="Yes",
         )
         assert len(result["coefficients"]) == 1
+
+    def test_weighted_regression(self):
+        """Weighted Poisson regression returns weighted=True."""
+        df = DF.copy()
+        df["weight"] = np.random.default_rng(42).uniform(0.5, 5.0, size=len(df))
+        result = run_poisson_regression(
+            df, "visits", "exposure", ["age"],
+            exposure_positive="Yes",
+            weight_col="weight",
+        )
+        assert result["weighted"] is True
+
+    def test_weighted_interpretation_mentions_survey(self):
+        """Weighted Poisson regression interpretation says 'survey-weighted'."""
+        df = DF.copy()
+        df["weight"] = np.random.default_rng(42).uniform(0.5, 5.0, size=len(df))
+        result = run_poisson_regression(
+            df, "visits", "exposure", ["age"],
+            exposure_positive="Yes",
+            weight_col="weight",
+        )
+        assert "survey-weighted" in result["interpretation"].lower()
 
 
 # ── TestRegressionInterpretations ──────────────────────────────────────────

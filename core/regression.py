@@ -1,7 +1,7 @@
 """Regression analysis for epidemiological data.
 
 Provides logistic, linear, and Poisson regression using statsmodels GLM
-for adjusted effect estimates (OR, β, IRR) with confidence intervals.
+for adjusted effect estimates (OR, beta, IRR) with confidence intervals.
 """
 
 import warnings
@@ -41,7 +41,8 @@ def _prepare_regression_data(
     exposure_positive: object | None = None,
     binarize_outcome: bool = False,
     outcome_positive: object | None = None,
-) -> tuple[pd.Series, pd.DataFrame, list[str]]:
+    weight_col: str | None = None,
+) -> tuple[pd.Series, pd.DataFrame, list[str], pd.Series | None]:
     """Prepare data for GLM regression.
 
     Drops NaN rows, binarizes exposure/outcome if needed, encodes
@@ -55,12 +56,16 @@ def _prepare_regression_data(
         exposure_positive: If given, binarize exposure (1 = this value, 0 = other).
         binarize_outcome: If True, binarize outcome using outcome_positive.
         outcome_positive: Value to treat as positive outcome (1).
+        weight_col: Optional column name for survey weights.
 
     Returns:
-        Tuple of (y, X, feature_names) where feature_names lists
-        predictors excluding the constant.
+        Tuple of (y, X, feature_names, weights) where feature_names lists
+        predictors excluding the constant. weights is None when weight_col
+        is not provided.
     """
     relevant_cols = [outcome_col, exposure_col] + list(confounder_cols)
+    if weight_col is not None:
+        relevant_cols.append(weight_col)
     subset = df[relevant_cols].dropna().copy()
 
     # Binarize outcome if requested
@@ -91,7 +96,12 @@ def _prepare_regression_data(
     # Add constant
     X = sm.add_constant(X)
 
-    return y, X, feature_names
+    aligned_weights = subset[weight_col] if weight_col is not None else None
+
+    if aligned_weights is not None and (aligned_weights <= 0).any():
+        raise ValueError("Weight column must contain only positive (> 0) values.")
+
+    return y, X, feature_names, aligned_weights
 
 
 def _extract_glm_results(
@@ -190,6 +200,50 @@ def _extract_glm_results(
     }
 
 
+def _fit_glm(
+    y: pd.Series,
+    X: pd.DataFrame,
+    family: sm.families.Family,
+    aligned_weights: pd.Series | None,
+) -> sm.regression.linear_model.RegressionResultsWrapper:
+    """Fit a GLM with optional frequency weights.
+
+    Args:
+        y: Response variable.
+        X: Design matrix (with constant).
+        family: GLM family (Binomial, Gaussian, Poisson).
+        aligned_weights: Optional frequency weights aligned with y.
+
+    Returns:
+        Fitted GLM results.
+
+    Raises:
+        ValueError: If fitting fails or produces warnings.
+    """
+    glm_kwargs: dict = {}
+    if aligned_weights is not None:
+        glm_kwargs["freq_weights"] = aligned_weights.values
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings("error", category=Warning)
+        try:
+            model = sm.GLM(y, X, family=family, **glm_kwargs)
+            return model.fit()
+        except Warning as w:
+            raise ValueError(f"Model fitting warning: {w}")
+        except Exception as e:
+            raise ValueError(f"Model fitting failed: {e}")
+
+
+def _validate_obs_vs_params(n_obs: int, n_params: int) -> None:
+    """Raise ValueError if there are not enough observations for the parameters."""
+    if n_obs <= n_params:
+        raise ValueError(
+            f"Not enough observations ({n_obs}) for the number of parameters ({n_params}). "
+            f"Reduce confounders or increase sample size."
+        )
+
+
 def run_logistic_regression(
     df: pd.DataFrame,
     outcome_col: str,
@@ -197,6 +251,7 @@ def run_logistic_regression(
     confounder_cols: list[str],
     outcome_positive: object,
     exposure_positive: object | None = None,
+    weight_col: str | None = None,
 ) -> dict:
     """Run logistic regression (adjusted odds ratios).
 
@@ -207,9 +262,10 @@ def run_logistic_regression(
         confounder_cols: List of confounder column names.
         outcome_positive: Value indicating positive outcome.
         exposure_positive: Value indicating positive exposure (for binarization).
+        weight_col: Optional column name for survey weights (freq_weights).
 
     Returns:
-        Dict with model_type, n_observations, n_dropped, converged,
+        Dict with model_type, weighted, n_observations, n_dropped, converged,
         exposure_effect, coefficients, model_fit, and interpretation.
 
     Raises:
@@ -217,47 +273,28 @@ def run_logistic_regression(
     """
     n_total = len(df)
 
-    y, X, feature_names = _prepare_regression_data(
+    y, X, feature_names, aligned_weights = _prepare_regression_data(
         df, outcome_col, exposure_col, confounder_cols,
         exposure_positive=exposure_positive,
         binarize_outcome=True,
         outcome_positive=outcome_positive,
+        weight_col=weight_col,
     )
 
     n_obs = len(y)
     n_dropped = n_total - n_obs
 
-    # Validate binary outcome
-    unique_values = y.unique()
-    if len(unique_values) < 2:
+    if len(y.unique()) < 2:
         raise ValueError(
             f"Outcome '{outcome_col}' has only one level after binarization. "
             f"Both 0 and 1 must be present."
         )
 
-    # Check enough observations vs parameters
-    n_params = X.shape[1]
-    if n_obs <= n_params:
-        raise ValueError(
-            f"Not enough observations ({n_obs}) for the number of parameters ({n_params}). "
-            f"Reduce confounders or increase sample size."
-        )
-
-    # Fit model
-    with warnings.catch_warnings():
-        warnings.filterwarnings("error", category=Warning)
-        try:
-            model = sm.GLM(y, X, family=Binomial())
-            fit_result = model.fit()
-        except Warning as w:
-            raise ValueError(f"Model fitting warning: {w}")
-        except Exception as e:
-            raise ValueError(f"Model fitting failed: {e}")
-
+    _validate_obs_vs_params(n_obs, X.shape[1])
+    fit_result = _fit_glm(y, X, Binomial(), aligned_weights)
     extracted = _extract_glm_results(fit_result, feature_names, "logistic", exposure_col)
 
-    # Build interpretation
-    confounder_names = confounder_cols if confounder_cols else []
+    is_weighted = aligned_weights is not None
     exp_eff = extracted["exposure_effect"]
     interpretation = interpret_logistic_regression(
         exposure_name=exposure_col,
@@ -265,12 +302,14 @@ def run_logistic_regression(
         ci_lower=exp_eff["ci_lower"],
         ci_upper=exp_eff["ci_upper"],
         p_value=exp_eff["p_value"],
-        confounder_names=confounder_names,
+        confounder_names=confounder_cols,
         n_obs=n_obs,
+        weighted=is_weighted,
     )
 
     return {
         "model_type": "logistic",
+        "weighted": is_weighted,
         "n_observations": n_obs,
         "n_dropped": n_dropped,
         **extracted,
@@ -284,6 +323,7 @@ def run_linear_regression(
     exposure_col: str,
     confounder_cols: list[str],
     exposure_positive: object | None = None,
+    weight_col: str | None = None,
 ) -> dict:
     """Run linear regression (adjusted beta coefficients).
 
@@ -293,9 +333,10 @@ def run_linear_regression(
         exposure_col: Name of the exposure column.
         confounder_cols: List of confounder column names.
         exposure_positive: Value indicating positive exposure (for binarization).
+        weight_col: Optional column name for survey weights (freq_weights).
 
     Returns:
-        Dict with model_type, n_observations, n_dropped, converged,
+        Dict with model_type, weighted, n_observations, n_dropped, converged,
         exposure_effect, coefficients, model_fit, and interpretation.
 
     Raises:
@@ -303,40 +344,25 @@ def run_linear_regression(
     """
     n_total = len(df)
 
-    # Validate numeric outcome before preparation
     if not pd.api.types.is_numeric_dtype(df[outcome_col]):
         raise ValueError(
             f"Outcome '{outcome_col}' must be numeric for linear regression."
         )
 
-    y, X, feature_names = _prepare_regression_data(
+    y, X, feature_names, aligned_weights = _prepare_regression_data(
         df, outcome_col, exposure_col, confounder_cols,
         exposure_positive=exposure_positive,
+        weight_col=weight_col,
     )
 
     n_obs = len(y)
     n_dropped = n_total - n_obs
 
-    n_params = X.shape[1]
-    if n_obs <= n_params:
-        raise ValueError(
-            f"Not enough observations ({n_obs}) for the number of parameters ({n_params})."
-        )
-
-    # Fit model
-    with warnings.catch_warnings():
-        warnings.filterwarnings("error", category=Warning)
-        try:
-            model = sm.GLM(y, X, family=Gaussian())
-            fit_result = model.fit()
-        except Warning as w:
-            raise ValueError(f"Model fitting warning: {w}")
-        except Exception as e:
-            raise ValueError(f"Model fitting failed: {e}")
-
+    _validate_obs_vs_params(n_obs, X.shape[1])
+    fit_result = _fit_glm(y, X, Gaussian(), aligned_weights)
     extracted = _extract_glm_results(fit_result, feature_names, "linear", exposure_col)
 
-    confounder_names = confounder_cols if confounder_cols else []
+    is_weighted = aligned_weights is not None
     exp_eff = extracted["exposure_effect"]
     interpretation = interpret_linear_regression(
         exposure_name=exposure_col,
@@ -344,13 +370,15 @@ def run_linear_regression(
         ci_lower=exp_eff["ci_lower"],
         ci_upper=exp_eff["ci_upper"],
         p_value=exp_eff["p_value"],
-        confounder_names=confounder_names,
+        confounder_names=confounder_cols,
         n_obs=n_obs,
         r_squared=extracted["model_fit"].get("r_squared", 0.0),
+        weighted=is_weighted,
     )
 
     return {
         "model_type": "linear",
+        "weighted": is_weighted,
         "n_observations": n_obs,
         "n_dropped": n_dropped,
         **extracted,
@@ -364,6 +392,7 @@ def run_poisson_regression(
     exposure_col: str,
     confounder_cols: list[str],
     exposure_positive: object | None = None,
+    weight_col: str | None = None,
 ) -> dict:
     """Run Poisson regression (adjusted incidence rate ratios).
 
@@ -373,9 +402,10 @@ def run_poisson_regression(
         exposure_col: Name of the exposure column.
         confounder_cols: List of confounder column names.
         exposure_positive: Value indicating positive exposure (for binarization).
+        weight_col: Optional column name for survey weights (freq_weights).
 
     Returns:
-        Dict with model_type, n_observations, n_dropped, converged,
+        Dict with model_type, weighted, n_observations, n_dropped, converged,
         exposure_effect, coefficients, model_fit, and interpretation.
 
     Raises:
@@ -383,47 +413,31 @@ def run_poisson_regression(
     """
     n_total = len(df)
 
-    # Validate numeric outcome
     if not pd.api.types.is_numeric_dtype(df[outcome_col]):
         raise ValueError(
             f"Outcome '{outcome_col}' must be numeric for Poisson regression."
         )
 
-    # Check for negative values
     if (df[outcome_col].dropna() < 0).any():
         raise ValueError(
             f"Outcome '{outcome_col}' contains negative values. "
             f"Poisson regression requires non-negative counts."
         )
 
-    y, X, feature_names = _prepare_regression_data(
+    y, X, feature_names, aligned_weights = _prepare_regression_data(
         df, outcome_col, exposure_col, confounder_cols,
         exposure_positive=exposure_positive,
+        weight_col=weight_col,
     )
 
     n_obs = len(y)
     n_dropped = n_total - n_obs
 
-    n_params = X.shape[1]
-    if n_obs <= n_params:
-        raise ValueError(
-            f"Not enough observations ({n_obs}) for the number of parameters ({n_params})."
-        )
-
-    # Fit model
-    with warnings.catch_warnings():
-        warnings.filterwarnings("error", category=Warning)
-        try:
-            model = sm.GLM(y, X, family=Poisson())
-            fit_result = model.fit()
-        except Warning as w:
-            raise ValueError(f"Model fitting warning: {w}")
-        except Exception as e:
-            raise ValueError(f"Model fitting failed: {e}")
-
+    _validate_obs_vs_params(n_obs, X.shape[1])
+    fit_result = _fit_glm(y, X, Poisson(), aligned_weights)
     extracted = _extract_glm_results(fit_result, feature_names, "poisson", exposure_col)
 
-    confounder_names = confounder_cols if confounder_cols else []
+    is_weighted = aligned_weights is not None
     exp_eff = extracted["exposure_effect"]
     interpretation = interpret_poisson_regression(
         exposure_name=exposure_col,
@@ -431,12 +445,14 @@ def run_poisson_regression(
         ci_lower=exp_eff["ci_lower"],
         ci_upper=exp_eff["ci_upper"],
         p_value=exp_eff["p_value"],
-        confounder_names=confounder_names,
+        confounder_names=confounder_cols,
         n_obs=n_obs,
+        weighted=is_weighted,
     )
 
     return {
         "model_type": "poisson",
+        "weighted": is_weighted,
         "n_observations": n_obs,
         "n_dropped": n_dropped,
         **extracted,
