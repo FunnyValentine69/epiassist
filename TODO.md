@@ -115,7 +115,7 @@
 ## Phase 2.1: Basic Calculators (In Progress)
 - [x] Mantel-Haenszel adjusted OR/RR
 - [x] E-value calculator (unmeasured confounding) — auto-computed from crude/adjusted OR in Data Analysis Tab 4
-- [ ] SMR/SIR calculator (standardized ratios)
+- [x] SMR/SIR calculator (standardized ratios)
 - [ ] Direct/indirect standardization
 
 ## Phase 2.2: Regression Analysis (Planned)

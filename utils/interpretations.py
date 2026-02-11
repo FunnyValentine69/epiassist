@@ -41,9 +41,7 @@ def interpret_odds_ratio(
         return "The odds ratio is 1.0, indicating no association between exposure and outcome."
 
     # Check statistical significance
-    if ci_lower > 1:
-        significance = "This association is statistically significant (CI excludes 1.0)."
-    elif ci_upper < 1:
+    if ci_lower > 1 or ci_upper < 1:
         significance = "This association is statistically significant (CI excludes 1.0)."
     else:
         significance = "This association is NOT statistically significant (CI includes 1.0)."
@@ -326,6 +324,51 @@ def interpret_mantel_haenszel(
             )
 
     return " ".join(parts)
+
+
+def interpret_smr(smr: float, ci_lower: float, ci_upper: float) -> str:
+    """Generate plain English interpretation of a Standardized Mortality/Incidence Ratio.
+
+    Args:
+        smr: The SMR/SIR point estimate (null = 1.0).
+        ci_lower: Lower bound of the confidence interval.
+        ci_upper: Upper bound of the confidence interval.
+
+    Returns:
+        Plain English interpretation string.
+    """
+    if smr is None:
+        return "SMR/SIR could not be calculated."
+
+    # Determine direction
+    if smr > 1:
+        percent_excess = (smr - 1) * 100
+        direction = (
+            f"The observed number of events is {percent_excess:.0f}% higher "
+            f"than expected based on the reference population rates."
+        )
+    elif smr < 1:
+        percent_deficit = (1 - smr) * 100
+        direction = (
+            f"The observed number of events is {percent_deficit:.0f}% lower "
+            f"than expected based on the reference population rates."
+        )
+    else:
+        return (
+            "SMR/SIR = 1.00. The observed number of events exactly matches "
+            "the expected number based on the reference population."
+        )
+
+    # Check statistical significance (CI excludes 1.0)
+    if ci_lower > 1 or ci_upper < 1:
+        significance = "This is statistically significant (CI excludes 1.0)."
+    else:
+        significance = "This is NOT statistically significant (CI includes 1.0)."
+
+    return (
+        f"SMR/SIR = {smr:.2f} (95% CI: {ci_lower:.2f}-{ci_upper:.2f}). "
+        f"{direction} {significance}"
+    )
 
 
 def interpret_meta_analysis(

@@ -62,10 +62,10 @@
 - Export/import DAG functionality
 
 #### 2_Stats_Calculator.py
-- 2x2 contingency table input
-- Odds Ratio, Risk Ratio, Risk Difference calculations
+- Tabbed layout: "2x2 Table (OR/RR/RD)" and "SMR/SIR Calculator"
+- 2x2 contingency table input with OR, RR, RD, Chi-square
+- SMR/SIR: simple mode (observed/expected) or stratified mode (person-time + reference rates)
 - Confidence interval display
-- Chi-square test results
 - Natural language interpretations
 
 #### 3_Hypothesis_Testing.py
@@ -195,6 +195,19 @@ def grouped_descriptive_stats(df: pd.DataFrame, variable: str, group_by: str) ->
 def build_contingency_table(df: pd.DataFrame, outcome_col: str, exposure_col: str, outcome_positive: object, exposure_positive: object) -> dict
 ```
 
+#### smr_calculator.py
+```python
+def calculate_smr(observed: int, expected: float, ci_level: float = 0.95) -> dict
+    # SMR = observed / expected, exact Poisson CI via chi-squared
+    # Returns: value, ci_lower, ci_upper, interpretation, observed, expected
+def calculate_expected_events(strata: list[dict]) -> dict
+    # Sums rate * person_time per stratum
+    # Returns: expected, strata_details, total_person_time, total_observed
+def calculate_smr_stratified(strata: list[dict], ci_level: float = 0.95) -> dict
+    # Pipeline: calculate_expected_events → calculate_smr
+    # Returns: SMR result + strata_details, total_person_time
+```
+
 #### e_value.py
 ```python
 def calculate_e_value(point_estimate: float, ci_bound: float = None) -> dict
@@ -211,6 +224,7 @@ def interpret_p_value(p: float, alpha: float = 0.05) -> str
 def interpret_power(power: float) -> str
 def interpret_e_value(e_value: float) -> str
 def interpret_heterogeneity(i_squared: float, q_p_value: float, num_studies: int) -> str
+def interpret_smr(smr: float, ci_lower: float, ci_upper: float) -> str
 def interpret_meta_analysis(pooled: float, ci_lower: float, ci_upper: float, measure_type: str, model: str) -> str
 def interpret_mantel_haenszel(or_value: float, or_ci_lower: float, or_ci_upper: float, homogeneity_p: float | None, n_strata: int, confounder_name: str) -> str
 ```
@@ -424,6 +438,14 @@ st.session_state = {
     "meta_results": dict | None,           # Full analysis results
     "meta_measure_type": str,              # Selected measure type
     "meta_model": str,                     # Selected model (fixed/random/both)
+
+    # SMR/SIR Calculator
+    "smr_mode": str,                     # "Simple (totals only)" or "Stratified ..."
+    "smr_observed": int,                 # Simple mode: observed events
+    "smr_expected": float,               # Simple mode: expected events
+    "smr_result": dict | None,           # Simple mode result
+    "smr_strata_df": pd.DataFrame,       # Stratified mode: editable strata table
+    "smr_strat_result": dict | None,     # Stratified mode result
 
     # Data Analysis
     "data_df": pd.DataFrame | None,        # Uploaded dataset

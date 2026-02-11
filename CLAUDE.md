@@ -45,6 +45,7 @@ epiassist/
 │   ├── power_calculator.py
 │   ├── e_value.py            # E-value sensitivity analysis (used by pages 5 & 7)
 │   ├── meta_analysis.py      # Meta-analysis pooling (fixed/random effects)
+│   ├── smr_calculator.py     # SMR/SIR calculator (exact Poisson CI)
 │   └── data_analyzer.py      # Data upload, summary, contingency tables
 ├── utils/
 │   ├── interpretations.py
@@ -76,7 +77,7 @@ All statistical functions must return a dict with this structure:
 ### Session State
 
 - Use `st.session_state` for all cross-page persistence
-- Prefix keys by feature: `dag_`, `stats_`, `hypo_`, `paper_`, `power_`, `meta_`, `data_`
+- Prefix keys by feature: `dag_`, `stats_`, `hypo_`, `paper_`, `power_`, `meta_`, `data_`, `smr_`
 
 ### Natural Language Interpretations
 

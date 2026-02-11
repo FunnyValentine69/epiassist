@@ -1,5 +1,6 @@
 """Statistics Calculator page for epidemiological measures."""
 
+import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
@@ -9,244 +10,373 @@ from core.stats_calculator import (
     calculate_risk_difference,
     calculate_chi_square,
 )
+from core.smr_calculator import calculate_smr, calculate_smr_stratified
 from utils.constants import DEMO_2X2_TABLE
 
 st.set_page_config(page_title="Statistics Calculator - EpiAssist", layout="wide")
 
 st.title("Statistics Calculator")
 st.markdown("""
-Calculate Odds Ratios, Risk Ratios, Risk Differences, and Chi-square tests
-from 2x2 contingency tables with 95% confidence intervals.
+Calculate epidemiological measures from contingency tables (OR, RR, RD, Chi-square)
+or compute Standardized Mortality/Incidence Ratios (SMR/SIR).
 """)
 
 st.divider()
 
-col1, col2 = st.columns([1, 1])
+tab_2x2, tab_smr = st.tabs(["2x2 Table (OR/RR/RD)", "SMR/SIR Calculator"])
 
-with col1:
-    st.markdown("### 2x2 Contingency Table")
+# ── Tab 1: 2x2 Table ──────────────────────────────────────────────────────
+with tab_2x2:
+    col1, col2 = st.columns([1, 1])
 
-    st.markdown("""
-    Enter counts from your study:
+    with col1:
+        st.markdown("### 2x2 Contingency Table")
 
-    |  | Outcome (+) | Outcome (-) |
-    |---|---|---|
-    | **Exposed** | a | b |
-    | **Unexposed** | c | d |
-    """)
+        st.markdown("""
+        Enter counts from your study:
 
-    # Load demo data button
-    if st.button("Load Demo Data"):
-        st.session_state.stats_a = DEMO_2X2_TABLE["a"]
-        st.session_state.stats_b = DEMO_2X2_TABLE["b"]
-        st.session_state.stats_c = DEMO_2X2_TABLE["c"]
-        st.session_state.stats_d = DEMO_2X2_TABLE["d"]
-        st.rerun()
+        |  | Outcome (+) | Outcome (-) |
+        |---|---|---|
+        | **Exposed** | a | b |
+        | **Unexposed** | c | d |
+        """)
 
-    # Initialize session state
-    if "stats_a" not in st.session_state:
-        st.session_state.stats_a = DEMO_2X2_TABLE["a"]
-    if "stats_b" not in st.session_state:
-        st.session_state.stats_b = DEMO_2X2_TABLE["b"]
-    if "stats_c" not in st.session_state:
-        st.session_state.stats_c = DEMO_2X2_TABLE["c"]
-    if "stats_d" not in st.session_state:
-        st.session_state.stats_d = DEMO_2X2_TABLE["d"]
+        # Load demo data button
+        if st.button("Load Demo Data"):
+            st.session_state.stats_a = DEMO_2X2_TABLE["a"]
+            st.session_state.stats_b = DEMO_2X2_TABLE["b"]
+            st.session_state.stats_c = DEMO_2X2_TABLE["c"]
+            st.session_state.stats_d = DEMO_2X2_TABLE["d"]
+            st.rerun()
 
-    subcol1, subcol2 = st.columns(2)
-    with subcol1:
-        a = st.number_input(
-            "a (Exposed, Outcome+)",
-            min_value=0,
-            value=st.session_state.stats_a,
-            key="input_a",
-        )
-        c = st.number_input(
-            "c (Unexposed, Outcome+)",
-            min_value=0,
-            value=st.session_state.stats_c,
-            key="input_c",
-        )
-    with subcol2:
-        b = st.number_input(
-            "b (Exposed, Outcome-)",
-            min_value=0,
-            value=st.session_state.stats_b,
-            key="input_b",
-        )
-        d = st.number_input(
-            "d (Unexposed, Outcome-)",
-            min_value=0,
-            value=st.session_state.stats_d,
-            key="input_d",
-        )
+        # Initialize session state
+        for key in ("a", "b", "c", "d"):
+            if f"stats_{key}" not in st.session_state:
+                st.session_state[f"stats_{key}"] = DEMO_2X2_TABLE[key]
 
-    # Update session state
-    st.session_state.stats_a = a
-    st.session_state.stats_b = b
-    st.session_state.stats_c = c
-    st.session_state.stats_d = d
-
-    # Display table summary
-    n1 = a + b
-    n0 = c + d
-    total = n1 + n0
-
-    st.markdown(f"""
-    **Summary:**
-    - Exposed: {n1} ({a} with outcome, {b} without)
-    - Unexposed: {n0} ({c} with outcome, {d} without)
-    - Total: {total}
-    """)
-
-    calculate_btn = st.button("Calculate Statistics", type="primary")
-
-with col2:
-    st.markdown("### Results")
-
-    if calculate_btn or "stats_results" in st.session_state:
-        # Calculate all statistics
-        or_result = calculate_odds_ratio(a, b, c, d)
-        rr_result = calculate_risk_ratio(a, b, c, d)
-        rd_result = calculate_risk_difference(a, b, c, d)
-        chi_result = calculate_chi_square(a, b, c, d)
-
-        # Store results
-        st.session_state.stats_results = {
-            "or": or_result,
-            "rr": rr_result,
-            "rd": rd_result,
-            "chi": chi_result,
-        }
-
-        # Display results in metrics
-        col_or, col_rr = st.columns(2)
-
-        with col_or:
-            st.metric(
-                "Odds Ratio (OR)",
-                f"{or_result['value']:.2f}" if or_result["value"] else "N/A",
-                f"95% CI: {or_result['ci_lower']:.2f}-{or_result['ci_upper']:.2f}"
-                if or_result["ci_lower"]
-                else "",
+        subcol1, subcol2 = st.columns(2)
+        with subcol1:
+            a = st.number_input(
+                "a (Exposed, Outcome+)",
+                min_value=0,
+                value=st.session_state.stats_a,
+                key="input_a",
+            )
+            c = st.number_input(
+                "c (Unexposed, Outcome+)",
+                min_value=0,
+                value=st.session_state.stats_c,
+                key="input_c",
+            )
+        with subcol2:
+            b = st.number_input(
+                "b (Exposed, Outcome-)",
+                min_value=0,
+                value=st.session_state.stats_b,
+                key="input_b",
+            )
+            d = st.number_input(
+                "d (Unexposed, Outcome-)",
+                min_value=0,
+                value=st.session_state.stats_d,
+                key="input_d",
             )
 
-        with col_rr:
-            st.metric(
-                "Risk Ratio (RR)",
-                f"{rr_result['value']:.2f}" if rr_result["value"] else "N/A",
-                f"95% CI: {rr_result['ci_lower']:.2f}-{rr_result['ci_upper']:.2f}"
-                if rr_result["ci_lower"]
-                else "",
-            )
+        # Update session state
+        st.session_state.stats_a = a
+        st.session_state.stats_b = b
+        st.session_state.stats_c = c
+        st.session_state.stats_d = d
 
-        col_rd, col_chi = st.columns(2)
+        # Display table summary
+        n1 = a + b
+        n0 = c + d
+        total = n1 + n0
 
-        with col_rd:
-            st.metric(
-                "Risk Difference",
-                f"{rd_result['value']:.1%}" if rd_result["value"] else "N/A",
-                f"95% CI: {rd_result['ci_lower']:.1%}-{rd_result['ci_upper']:.1%}"
-                if rd_result["ci_lower"]
-                else "",
-            )
+        st.markdown(f"""
+        **Summary:**
+        - Exposed: {n1} ({a} with outcome, {b} without)
+        - Unexposed: {n0} ({c} with outcome, {d} without)
+        - Total: {total}
+        """)
 
-        with col_chi:
-            p_val = chi_result["p_value"]
-            p_display = "< 0.001" if p_val < 0.001 else f"{p_val:.4f}"
-            st.metric(
-                "Chi-square",
-                f"{chi_result['value']:.2f}",
-                f"p-value: {p_display}",
-            )
+        calculate_btn = st.button("Calculate Statistics", type="primary")
 
-        # Forest plot-style visualization
-        st.markdown("### Effect Estimate Visualization")
+    with col2:
+        st.markdown("### Results")
 
-        fig = go.Figure()
+        if calculate_btn or "stats_results" in st.session_state:
+            # Calculate all statistics
+            or_result = calculate_odds_ratio(a, b, c, d)
+            rr_result = calculate_risk_ratio(a, b, c, d)
+            rd_result = calculate_risk_difference(a, b, c, d)
+            chi_result = calculate_chi_square(a, b, c, d)
 
-        # Add OR point and CI
-        fig.add_trace(
-            go.Scatter(
-                x=[or_result["value"]],
-                y=[2],
-                mode="markers",
-                marker=dict(size=12, color="#FF6B6B"),
-                name="OR",
-                error_x=dict(
-                    type="data",
-                    symmetric=False,
-                    array=[or_result["ci_upper"] - or_result["value"]],
-                    arrayminus=[or_result["value"] - or_result["ci_lower"]],
-                ),
-            )
-        )
+            # Store results
+            st.session_state.stats_results = {
+                "or": or_result,
+                "rr": rr_result,
+                "rd": rd_result,
+                "chi": chi_result,
+            }
 
-        # Add RR point and CI
-        if rr_result["value"]:
+            # Display results in metrics
+            col_or, col_rr = st.columns(2)
+
+            with col_or:
+                st.metric(
+                    "Odds Ratio (OR)",
+                    f"{or_result['value']:.2f}" if or_result["value"] else "N/A",
+                    f"95% CI: {or_result['ci_lower']:.2f}-{or_result['ci_upper']:.2f}"
+                    if or_result["ci_lower"]
+                    else "",
+                )
+
+            with col_rr:
+                st.metric(
+                    "Risk Ratio (RR)",
+                    f"{rr_result['value']:.2f}" if rr_result["value"] else "N/A",
+                    f"95% CI: {rr_result['ci_lower']:.2f}-{rr_result['ci_upper']:.2f}"
+                    if rr_result["ci_lower"]
+                    else "",
+                )
+
+            col_rd, col_chi = st.columns(2)
+
+            with col_rd:
+                st.metric(
+                    "Risk Difference",
+                    f"{rd_result['value']:.1%}" if rd_result["value"] else "N/A",
+                    f"95% CI: {rd_result['ci_lower']:.1%}-{rd_result['ci_upper']:.1%}"
+                    if rd_result["ci_lower"]
+                    else "",
+                )
+
+            with col_chi:
+                p_val = chi_result["p_value"]
+                p_display = "< 0.001" if p_val < 0.001 else f"{p_val:.4f}"
+                st.metric(
+                    "Chi-square",
+                    f"{chi_result['value']:.2f}",
+                    f"p-value: {p_display}",
+                )
+
+            # Forest plot-style visualization
+            st.markdown("### Effect Estimate Visualization")
+
+            fig = go.Figure()
+
+            # Add OR point and CI
             fig.add_trace(
                 go.Scatter(
-                    x=[rr_result["value"]],
-                    y=[1],
+                    x=[or_result["value"]],
+                    y=[2],
                     mode="markers",
-                    marker=dict(size=12, color="#4ECDC4"),
-                    name="RR",
+                    marker=dict(size=12, color="#FF6B6B"),
+                    name="OR",
                     error_x=dict(
                         type="data",
                         symmetric=False,
-                        array=[rr_result["ci_upper"] - rr_result["value"]],
-                        arrayminus=[rr_result["value"] - rr_result["ci_lower"]],
+                        array=[or_result["ci_upper"] - or_result["value"]],
+                        arrayminus=[or_result["value"] - or_result["ci_lower"]],
                     ),
                 )
             )
 
-        # Add reference line at 1
-        fig.add_vline(x=1, line_dash="dash", line_color="gray")
+            # Add RR point and CI
+            if rr_result["value"]:
+                fig.add_trace(
+                    go.Scatter(
+                        x=[rr_result["value"]],
+                        y=[1],
+                        mode="markers",
+                        marker=dict(size=12, color="#4ECDC4"),
+                        name="RR",
+                        error_x=dict(
+                            type="data",
+                            symmetric=False,
+                            array=[rr_result["ci_upper"] - rr_result["value"]],
+                            arrayminus=[rr_result["value"] - rr_result["ci_lower"]],
+                        ),
+                    )
+                )
 
-        fig.update_layout(
-            title="Effect Estimates with 95% CI",
-            xaxis_title="Effect Estimate",
-            yaxis=dict(
-                ticktext=["RR", "OR"],
-                tickvals=[1, 2],
-                range=[0, 3],
-            ),
-            showlegend=False,
-            height=250,
-        )
+            # Add reference line at 1
+            fig.add_vline(x=1, line_dash="dash", line_color="gray")
 
-        st.plotly_chart(fig, width="stretch")
+            fig.update_layout(
+                title="Effect Estimates with 95% CI",
+                xaxis_title="Effect Estimate",
+                yaxis=dict(
+                    ticktext=["RR", "OR"],
+                    tickvals=[1, 2],
+                    range=[0, 3],
+                ),
+                showlegend=False,
+                height=250,
+            )
 
-        # Interpretations
-        st.markdown("### Interpretations")
+            st.plotly_chart(fig, width="stretch")
 
-        with st.expander("Odds Ratio Interpretation", expanded=True):
-            st.markdown(or_result["interpretation"])
+            # Interpretations
+            st.markdown("### Interpretations")
 
-        with st.expander("Risk Ratio Interpretation"):
-            st.markdown(rr_result["interpretation"])
+            with st.expander("Odds Ratio Interpretation", expanded=True):
+                st.markdown(or_result["interpretation"])
 
-        with st.expander("Risk Difference Interpretation"):
-            st.markdown(rd_result["interpretation"])
+            with st.expander("Risk Ratio Interpretation"):
+                st.markdown(rr_result["interpretation"])
 
-        with st.expander("Chi-square Test Interpretation"):
-            st.markdown(chi_result["interpretation"])
+            with st.expander("Risk Difference Interpretation"):
+                st.markdown(rd_result["interpretation"])
+
+            with st.expander("Chi-square Test Interpretation"):
+                st.markdown(chi_result["interpretation"])
+
+        else:
+            st.info("Enter your data and click Calculate to see results.")
+
+    st.divider()
+
+    st.markdown("### Demo Data Reference")
+    st.markdown("""
+    The default values show data from the **Hearing Loss and Unemployment** study:
+
+    | | Unemployed (+) | Employed (-) |
+    |---|---|---|
+    | **Hearing Loss** | 80 | 150 |
+    | **No Hearing Loss** | 70 | 400 |
+
+    - **OR = 3.05**: Individuals with hearing loss have 3x higher odds of unemployment
+    - **95% CI**: (2.10, 4.42) - statistically significant
+    - **p < 0.001**: Strong evidence of association
+    """)
+
+# ── Tab 2: SMR/SIR Calculator ─────────────────────────────────────────────
+with tab_smr:
+    st.markdown("""
+    The **Standardized Mortality Ratio (SMR)** or **Standardized Incidence Ratio (SIR)**
+    compares observed events to expected events based on reference population rates.
+
+    **SMR = Observed / Expected** (null value = 1.0)
+    """)
+
+    smr_mode = st.radio(
+        "Input mode",
+        ["Simple (totals only)", "Stratified (by age/sex groups)"],
+        key="smr_mode",
+        horizontal=True,
+    )
+
+    if smr_mode == "Simple (totals only)":
+        # ── Simple mode ────────────────────────────────────────────────
+        col_in, col_out = st.columns([1, 1])
+
+        with col_in:
+            st.markdown("### Input")
+            smr_observed = st.number_input(
+                "Observed events",
+                min_value=0,
+                value=45,
+                key="smr_observed",
+            )
+            smr_expected = st.number_input(
+                "Expected events",
+                min_value=0.01,
+                value=30.0,
+                step=0.1,
+                format="%.2f",
+                key="smr_expected",
+            )
+            smr_calc_btn = st.button("Calculate SMR/SIR", type="primary")
+
+        with col_out:
+            st.markdown("### Results")
+            if smr_calc_btn or "smr_result" in st.session_state:
+                try:
+                    result = calculate_smr(smr_observed, smr_expected)
+                    st.session_state.smr_result = result
+
+                    st.metric(
+                        "SMR/SIR",
+                        f"{result['value']:.4f}",
+                        f"95% CI: {result['ci_lower']:.4f}-{result['ci_upper']:.4f}",
+                    )
+                    st.markdown(
+                        f"**Observed:** {result['observed']} | "
+                        f"**Expected:** {result['expected']:.2f}"
+                    )
+                    with st.expander("Interpretation", expanded=True):
+                        st.markdown(result["interpretation"])
+
+                except ValueError as e:
+                    st.error(str(e))
+            else:
+                st.info("Enter observed and expected counts, then click Calculate.")
 
     else:
-        st.info("Enter your data and click Calculate to see results.")
+        # ── Stratified mode ────────────────────────────────────────────
+        st.markdown("### Stratified Data")
+        st.markdown(
+            "Enter person-time and reference rates by stratum. "
+            "The expected events are computed as `person_time * reference_rate`."
+        )
 
-st.divider()
+        # Default demo strata
+        if "smr_strata_df" not in st.session_state:
+            st.session_state.smr_strata_df = pd.DataFrame({
+                "Stratum": ["20-39", "40-59", "60-79"],
+                "Person-Time": [5000.0, 8000.0, 3000.0],
+                "Reference Rate": [0.001, 0.004, 0.012],
+                "Observed": [8, 40, 42],
+            })
 
-st.markdown("### Demo Data Reference")
-st.markdown("""
-The default values show data from the **Hearing Loss and Unemployment** study:
+        edited_df = st.data_editor(
+            st.session_state.smr_strata_df,
+            num_rows="dynamic",
+            key="smr_editor",
+        )
 
-| | Unemployed (+) | Employed (-) |
-|---|---|---|
-| **Hearing Loss** | 80 | 150 |
-| **No Hearing Loss** | 70 | 400 |
+        smr_strat_btn = st.button("Calculate Stratified SMR/SIR", type="primary")
 
-- **OR = 3.05**: Individuals with hearing loss have 3x higher odds of unemployment
-- **95% CI**: (2.10, 4.42) - statistically significant
-- **p < 0.001**: Strong evidence of association
-""")
+        if smr_strat_btn or "smr_strat_result" in st.session_state:
+            # Validate no empty cells before building strata
+            if edited_df[["Person-Time", "Reference Rate", "Observed"]].isna().any().any():
+                st.error("All strata rows must have values. Please fill in empty cells.")
+            else:
+                try:
+                    strata = [
+                        {
+                            "stratum_name": row["Stratum"],
+                            "person_time": float(row["Person-Time"]),
+                            "reference_rate": float(row["Reference Rate"]),
+                            "observed": int(row["Observed"]),
+                        }
+                        for _, row in edited_df.iterrows()
+                    ]
+
+                    result = calculate_smr_stratified(strata)
+                    st.session_state.smr_strat_result = result
+
+                    st.markdown("### Results")
+
+                    st.metric(
+                        "SMR/SIR",
+                        f"{result['value']:.4f}",
+                        f"95% CI: {result['ci_lower']:.4f}-{result['ci_upper']:.4f}",
+                    )
+                    st.markdown(
+                        f"**Total Observed:** {result['observed']} | "
+                        f"**Total Expected:** {result['expected']:.2f} | "
+                        f"**Total Person-Time:** {result['total_person_time']:,.0f}"
+                    )
+
+                    with st.expander("Interpretation", expanded=True):
+                        st.markdown(result["interpretation"])
+
+                    with st.expander("Strata Breakdown"):
+                        breakdown = pd.DataFrame(result["strata_details"])
+                        st.dataframe(breakdown, use_container_width=True)
+
+                except (ValueError, KeyError) as e:
+                    st.error(f"Calculation error: {e}")
