@@ -75,3 +75,6 @@ test_papers/*.pdf
 test_papers/extracted_text/
 test_papers/extraction_report.csv
 test_papers/missed_patterns.txt
+# Claude Code
+CLAUDE.md
+.claude/
