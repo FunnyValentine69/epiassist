@@ -100,7 +100,7 @@
 
 ### Long-term
 - [ ] Manuscript generator (methods section templates)
-- [ ] Propensity score calculator
+- [x] Propensity score calculator
 - [ ] Mediation analysis module
 - [ ] Export analysis sessions to PDF report
 
@@ -111,6 +111,17 @@
 - [x] Descriptive statistics (numeric + categorical, grouped by exposure)
 - [x] Auto-generated 2x2 cross-tabulation with OR/RR/RD/Chi-square
 - [x] 30 tests, 93% coverage on core/data_analyzer.py
+
+## Phase 2.4: Propensity Score Analysis (Complete)
+- [x] Propensity score estimation via logistic regression (GLM Binomial)
+- [x] IPTW weight calculation (ATE/ATT, stabilized, optional trimming)
+- [x] Common support assessment (overlap % with warning)
+- [x] Balance diagnostics with SMD threshold (0.1) and Love plot
+- [x] Treatment effect estimation with bootstrap CIs (binary OR, continuous mean diff)
+- [x] Survey weight integration (IPTW * survey weight)
+- [x] E-value integration for residual unmeasured confounding
+- [x] Data Analysis Tab 6 with full UI (settings, histograms, Love plot, metrics)
+- [x] 50 tests across 9 classes covering all functions and interpretations
 
 ## Phase 2.1: Basic Calculators (In Progress)
 - [x] Mantel-Haenszel adjusted OR/RR
