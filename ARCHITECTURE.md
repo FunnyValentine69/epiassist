@@ -257,6 +257,16 @@ def run_propensity_score_analysis(df, outcome_col, treatment_col, confounder_col
     # Returns: ps_model, common_support, iptw, balance, treatment_effect, interpretation
 ```
 
+#### mediation.py
+```python
+def fit_mediation_models(df, outcome_col, exposure_col, mediator_col, confounder_cols, exposure_positive, outcome_type="continuous", ...) -> dict
+def calculate_mediation_effects(a, b, c, c_prime, se_a, se_b, outcome_type="continuous") -> dict
+def bootstrap_mediation_ci(df, outcome_col, exposure_col, mediator_col, confounder_cols, exposure_positive, ..., n_boot=200) -> dict
+def run_mediation_analysis(df, outcome_col, exposure_col, mediator_col, confounder_cols, exposure_positive, ...) -> dict
+    # Baron-Kenny pipeline: 3 GLM models → effect decomposition → bootstrap CIs → interpretation
+    # Returns: models, effects, ci, n_observations, n_dropped, n_boot, interpretation
+```
+
 #### e_value.py
 ```python
 def calculate_e_value(point_estimate: float, ci_bound: float = None) -> dict
@@ -281,6 +291,7 @@ def interpret_logistic_regression(exposure_name, or_value, ci_lower, ci_upper, p
 def interpret_linear_regression(exposure_name, beta, ci_lower, ci_upper, p_value, confounder_names, n_obs, r_squared, weighted=False) -> str
 def interpret_poisson_regression(exposure_name, irr, ci_lower, ci_upper, p_value, confounder_names, n_obs, weighted=False) -> str
 def interpret_propensity_score(estimand, effect_value, ci_lower, ci_upper, outcome_type, treatment_name, confounder_names, n_obs, effective_n, all_balanced, n_balanced, n_total_covariates, weighted=False) -> str
+def interpret_mediation(mediator_name, exposure_name, outcome_name, indirect, direct, total, indirect_ci, direct_ci, sobel_p, proportion_mediated, method, n_obs, confounder_names, weighted=False) -> str
 ```
 
 #### constants.py
@@ -540,6 +551,10 @@ st.session_state = {
     "data_ps_trim": float,                 # Trimming quantile (0-0.05)
     "data_ps_n_boot": int,                 # Bootstrap iterations
     "data_ps_result": dict | None,         # Full PS analysis result
+
+    # Mediation Analysis (Data Analysis Tab 7)
+    "data_mediator_cols": list[str],       # Selected mediator columns
+    "data_med_result": dict | None,        # Full mediation analysis result
 }
 ```
 

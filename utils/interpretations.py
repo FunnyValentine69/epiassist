@@ -754,3 +754,133 @@ def interpret_propensity_score(
         f"of the outcome. This association is {sig}. "
         f"{balance_text} {eff_note}"
     )
+
+
+def interpret_mediation(
+    mediator_name: str,
+    exposure_name: str,
+    outcome_name: str,
+    indirect: float,
+    direct: float,
+    total: float,
+    indirect_ci: tuple[float, float],
+    direct_ci: tuple[float, float],
+    sobel_p: float | None,
+    proportion_mediated: float | None,
+    method: str,
+    n_obs: int,
+    confounder_names: list[str],
+    weighted: bool = False,
+) -> str:
+    """Generate plain English interpretation of mediation analysis.
+
+    Args:
+        mediator_name: Name of the mediator variable.
+        exposure_name: Name of the exposure variable.
+        outcome_name: Name of the outcome variable.
+        indirect: Indirect effect (a*b or c-c').
+        direct: Direct effect (c').
+        total: Total effect (c).
+        indirect_ci: 95% CI for indirect effect (lower, upper).
+        direct_ci: 95% CI for direct effect (lower, upper).
+        sobel_p: Sobel test p-value (None for binary outcomes).
+        proportion_mediated: Proportion mediated (None when signs differ).
+        method: "product" or "difference".
+        n_obs: Number of observations.
+        confounder_names: Confounders adjusted for.
+        weighted: Whether survey weights were applied.
+
+    Returns:
+        Plain English interpretation string.
+    """
+    prefix = "Survey-weighted Baron-Kenny" if weighted else "Baron-Kenny"
+
+    # Indirect effect significance via bootstrap CI
+    indirect_sig = indirect_ci[0] > 0 or indirect_ci[1] < 0
+
+    # Direct effect significance via bootstrap CI
+    direct_sig = direct_ci[0] > 0 or direct_ci[1] < 0
+
+    # Classification
+    if indirect_sig and not direct_sig:
+        class_desc = (
+            f"The indirect effect through {mediator_name} is statistically significant "
+            f"while the direct effect is not, suggesting full mediation."
+        )
+    elif indirect_sig and direct_sig:
+        class_desc = (
+            f"Both the indirect effect through {mediator_name} and the direct effect "
+            f"are statistically significant, suggesting partial mediation."
+        )
+    else:
+        class_desc = (
+            f"The indirect effect through {mediator_name} is not statistically significant, "
+            f"suggesting no evidence of mediation."
+        )
+
+    # Proportion mediated text
+    if proportion_mediated is not None and indirect_sig:
+        prop_text = (
+            f"Approximately {proportion_mediated * 100:.1f}% of the total effect "
+            f"is mediated through {mediator_name}."
+        )
+    elif proportion_mediated is None and indirect_sig:
+        prop_text = (
+            "Proportion mediated could not be calculated because the indirect "
+            "and total effects have different signs."
+        )
+    else:
+        prop_text = ""
+
+    # Sobel test text
+    if sobel_p is not None:
+        if sobel_p < ALPHA_DEFAULT:
+            sobel_text = (
+                f"The Sobel test confirms the indirect effect is statistically significant "
+                f"(p = {sobel_p:.4f})."
+            )
+        else:
+            sobel_text = (
+                f"The Sobel test indicates the indirect effect is not statistically significant "
+                f"(p = {sobel_p:.4f})."
+            )
+    else:
+        sobel_text = (
+            "The Sobel test is not applicable for binary outcomes; "
+            "bootstrap confidence intervals are used instead."
+        )
+
+    # Adjustment text
+    if confounder_names:
+        adj_text = f"adjusted for {', '.join(confounder_names)}"
+    else:
+        adj_text = "unadjusted"
+
+    # Method note
+    if method == "difference":
+        method_note = (
+            "The difference method (c - c') was used for the indirect effect "
+            "because the outcome is binary."
+        )
+    else:
+        method_note = (
+            "The product of coefficients method (a x b) was used for the indirect effect."
+        )
+
+    parts = [
+        f"{prefix} mediation analysis ({adj_text}, n = {n_obs:,}) "
+        f"examined whether {mediator_name} mediates the effect of "
+        f"{exposure_name} on {outcome_name}.",
+        f"Total effect = {total:.4f}, Direct effect = {direct:.4f} "
+        f"(95% CI: {direct_ci[0]:.4f} to {direct_ci[1]:.4f}), "
+        f"Indirect effect = {indirect:.4f} "
+        f"(95% CI: {indirect_ci[0]:.4f} to {indirect_ci[1]:.4f}).",
+        class_desc,
+    ]
+
+    if prop_text:
+        parts.append(prop_text)
+    parts.append(sobel_text)
+    parts.append(method_note)
+
+    return " ".join(parts)

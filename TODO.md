@@ -101,7 +101,7 @@
 ### Long-term
 - [ ] Manuscript generator (methods section templates)
 - [x] Propensity score calculator
-- [ ] Mediation analysis module
+- [x] Mediation analysis module
 - [ ] Export analysis sessions to PDF report
 
 ## Phase 2: Data Analysis Module (Complete)
@@ -122,6 +122,16 @@
 - [x] E-value integration for residual unmeasured confounding
 - [x] Data Analysis Tab 6 with full UI (settings, histograms, Love plot, metrics)
 - [x] 50 tests across 9 classes covering all functions and interpretations
+
+## Phase 2.5: Mediation Analysis (Complete)
+- [x] Baron-Kenny 3-step regression (total, a-path, direct models) via `_fit_glm`
+- [x] Indirect/direct/total effect decomposition (product method for continuous, difference method for binary)
+- [x] Sobel test for continuous outcomes, bootstrap percentile CIs for all
+- [x] Proportion mediated with sign-check guard
+- [x] Survey weight integration (passthrough to `_fit_glm`)
+- [x] DAG-based mediator auto-suggestion in Data Analysis Tab 2
+- [x] Data Analysis Tab 7 with full UI (settings, effect decomposition, path coefficients, interpretation)
+- [x] 42 tests across 6 classes covering data prep, model fitting, effects, bootstrap, full pipeline, interpretation
 
 ## Phase 2.1: Basic Calculators (In Progress)
 - [x] Mantel-Haenszel adjusted OR/RR
