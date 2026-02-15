@@ -9,6 +9,7 @@ from utils.constants import (
     I_SQUARED_THRESHOLDS,
     META_MEASURE_LABELS,
     RATIO_MEASURES,
+    SMD_BALANCE_THRESHOLD,
 )
 
 
@@ -635,4 +636,121 @@ def interpret_poisson_regression(
         f"p {p_str}), {adj_text}, based on {n_obs:,} observations. "
         f"Exposure to {exposure_name} is associated with {direction} "
         f"of the outcome. This association is {sig}."
+    )
+
+
+def interpret_propensity_score(
+    estimand: str,
+    effect_value: float,
+    ci_lower: float,
+    ci_upper: float,
+    outcome_type: str,
+    treatment_name: str,
+    confounder_names: list[str],
+    n_obs: int,
+    effective_n: float,
+    all_balanced: bool,
+    n_balanced: int,
+    n_total_covariates: int,
+    weighted: bool = False,
+) -> str:
+    """Generate plain English interpretation of propensity score analysis.
+
+    Args:
+        estimand: "ATE" or "ATT".
+        effect_value: Treatment effect (OR for binary, mean diff for continuous).
+        ci_lower: Lower bound of 95% CI.
+        ci_upper: Upper bound of 95% CI.
+        outcome_type: "binary" or "continuous".
+        treatment_name: Name of the treatment variable.
+        confounder_names: Confounder names used in PS model.
+        n_obs: Number of observations.
+        effective_n: Effective sample size after weighting.
+        all_balanced: True if all covariates have SMD < threshold after weighting.
+        n_balanced: Number of covariates with SMD < threshold after weighting.
+        n_total_covariates: Total number of covariates checked.
+        weighted: Whether survey weights were also applied.
+
+    Returns:
+        Plain English interpretation string.
+    """
+    import math
+
+    is_binary = outcome_type == "binary"
+    measure_label = "OR" if is_binary else "Mean Difference"
+    prefix = "Survey-weighted IPTW-adjusted" if weighted else "IPTW-adjusted"
+
+    # Guard against NaN inputs from bootstrap failure
+    if not math.isfinite(effect_value) or not math.isfinite(ci_lower) or not math.isfinite(ci_upper):
+        return (
+            f"{prefix} analysis could not produce reliable estimates. "
+            f"Bootstrap confidence intervals failed to converge. "
+            f"Consider simplifying the model, trimming extreme propensity scores, "
+            f"or checking data quality."
+        )
+
+    # Estimand explanation
+    if estimand == "ATE":
+        estimand_desc = "the average treatment effect in the full population"
+    else:
+        estimand_desc = "the average treatment effect among the treated"
+
+    # Direction and magnitude
+    if is_binary:
+        if effect_value > 1:
+            direction = f"{(effect_value - 1) * 100:.0f}% higher odds"
+        elif effect_value < 1:
+            direction = f"{(1 - effect_value) * 100:.0f}% lower odds"
+        else:
+            direction = "no difference in odds"
+        significant = ci_lower > 1.0 or ci_upper < 1.0
+    else:
+        if effect_value > 0:
+            direction = f"an increase of {effect_value:.2f}"
+        elif effect_value < 0:
+            direction = f"a decrease of {abs(effect_value):.2f}"
+        else:
+            direction = "no change"
+        significant = ci_lower > 0.0 or ci_upper < 0.0
+
+    sig = "statistically significant" if significant else "NOT statistically significant"
+
+    # Confounder list
+    if confounder_names:
+        adj_text = f"adjusted for {', '.join(confounder_names)}"
+    else:
+        adj_text = "using propensity score weights"
+
+    # Balance quality
+    if all_balanced:
+        balance_text = (
+            f"All {n_total_covariates} covariates achieved adequate balance "
+            f"(SMD < {SMD_BALANCE_THRESHOLD}) after IPTW weighting."
+        )
+    else:
+        balance_text = (
+            f"{n_balanced} of {n_total_covariates} covariates achieved adequate balance "
+            f"(SMD < {SMD_BALANCE_THRESHOLD}) after IPTW weighting. "
+            f"Residual imbalance may bias the treatment effect estimate."
+        )
+
+    # Effective N note
+    eff_ratio = effective_n / n_obs if n_obs > 0 else 0
+    if eff_ratio < 0.5:
+        eff_note = (
+            f"The effective sample size ({effective_n:.0f}) is substantially smaller "
+            f"than the actual sample ({n_obs:,}), indicating high weight variability. "
+            f"Consider trimming extreme propensity scores."
+        )
+    else:
+        eff_note = f"Effective sample size: {effective_n:.0f} of {n_obs:,} observations."
+
+    return (
+        f"{prefix} {measure_label} = {effect_value:.2f} "
+        f"(95% CI: {ci_lower:.2f}-{ci_upper:.2f}), "
+        f"estimating {estimand_desc} ({estimand}), "
+        f"{adj_text}, based on {n_obs:,} observations. "
+        f"Exposure to {treatment_name} is associated with {direction} "
+        f"of the outcome. This association is {sig}. "
+        f"{balance_text} {eff_note}"
     )
