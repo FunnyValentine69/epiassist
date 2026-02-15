@@ -117,6 +117,9 @@ STANDARD_POPULATIONS: dict[str, list[dict]] = {
     ],
 }
 
+# Propensity score balance threshold (Austin 2009)
+SMD_BALANCE_THRESHOLD: float = 0.1
+
 # Rate multipliers for direct standardization output
 RATE_MULTIPLIERS: dict[str, int] = {
     "per 1,000": 1_000,

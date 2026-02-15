@@ -9,6 +9,7 @@ from utils.constants import (
     I_SQUARED_THRESHOLDS,
     META_MEASURE_LABELS,
     RATIO_MEASURES,
+    SMD_BALANCE_THRESHOLD,
 )
 
 
@@ -636,3 +637,250 @@ def interpret_poisson_regression(
         f"Exposure to {exposure_name} is associated with {direction} "
         f"of the outcome. This association is {sig}."
     )
+
+
+def interpret_propensity_score(
+    estimand: str,
+    effect_value: float,
+    ci_lower: float,
+    ci_upper: float,
+    outcome_type: str,
+    treatment_name: str,
+    confounder_names: list[str],
+    n_obs: int,
+    effective_n: float,
+    all_balanced: bool,
+    n_balanced: int,
+    n_total_covariates: int,
+    weighted: bool = False,
+) -> str:
+    """Generate plain English interpretation of propensity score analysis.
+
+    Args:
+        estimand: "ATE" or "ATT".
+        effect_value: Treatment effect (OR for binary, mean diff for continuous).
+        ci_lower: Lower bound of 95% CI.
+        ci_upper: Upper bound of 95% CI.
+        outcome_type: "binary" or "continuous".
+        treatment_name: Name of the treatment variable.
+        confounder_names: Confounder names used in PS model.
+        n_obs: Number of observations.
+        effective_n: Effective sample size after weighting.
+        all_balanced: True if all covariates have SMD < threshold after weighting.
+        n_balanced: Number of covariates with SMD < threshold after weighting.
+        n_total_covariates: Total number of covariates checked.
+        weighted: Whether survey weights were also applied.
+
+    Returns:
+        Plain English interpretation string.
+    """
+    import math
+
+    is_binary = outcome_type == "binary"
+    measure_label = "OR" if is_binary else "Mean Difference"
+    prefix = "Survey-weighted IPTW-adjusted" if weighted else "IPTW-adjusted"
+
+    # Guard against NaN inputs from bootstrap failure
+    if not math.isfinite(effect_value) or not math.isfinite(ci_lower) or not math.isfinite(ci_upper):
+        return (
+            f"{prefix} analysis could not produce reliable estimates. "
+            f"Bootstrap confidence intervals failed to converge. "
+            f"Consider simplifying the model, trimming extreme propensity scores, "
+            f"or checking data quality."
+        )
+
+    # Estimand explanation
+    if estimand == "ATE":
+        estimand_desc = "the average treatment effect in the full population"
+    else:
+        estimand_desc = "the average treatment effect among the treated"
+
+    # Direction and magnitude
+    if is_binary:
+        if effect_value > 1:
+            direction = f"{(effect_value - 1) * 100:.0f}% higher odds"
+        elif effect_value < 1:
+            direction = f"{(1 - effect_value) * 100:.0f}% lower odds"
+        else:
+            direction = "no difference in odds"
+        significant = ci_lower > 1.0 or ci_upper < 1.0
+    else:
+        if effect_value > 0:
+            direction = f"an increase of {effect_value:.2f}"
+        elif effect_value < 0:
+            direction = f"a decrease of {abs(effect_value):.2f}"
+        else:
+            direction = "no change"
+        significant = ci_lower > 0.0 or ci_upper < 0.0
+
+    sig = "statistically significant" if significant else "NOT statistically significant"
+
+    # Confounder list
+    if confounder_names:
+        adj_text = f"adjusted for {', '.join(confounder_names)}"
+    else:
+        adj_text = "using propensity score weights"
+
+    # Balance quality
+    if all_balanced:
+        balance_text = (
+            f"All {n_total_covariates} covariates achieved adequate balance "
+            f"(SMD < {SMD_BALANCE_THRESHOLD}) after IPTW weighting."
+        )
+    else:
+        balance_text = (
+            f"{n_balanced} of {n_total_covariates} covariates achieved adequate balance "
+            f"(SMD < {SMD_BALANCE_THRESHOLD}) after IPTW weighting. "
+            f"Residual imbalance may bias the treatment effect estimate."
+        )
+
+    # Effective N note
+    eff_ratio = effective_n / n_obs if n_obs > 0 else 0
+    if eff_ratio < 0.5:
+        eff_note = (
+            f"The effective sample size ({effective_n:.0f}) is substantially smaller "
+            f"than the actual sample ({n_obs:,}), indicating high weight variability. "
+            f"Consider trimming extreme propensity scores."
+        )
+    else:
+        eff_note = f"Effective sample size: {effective_n:.0f} of {n_obs:,} observations."
+
+    return (
+        f"{prefix} {measure_label} = {effect_value:.2f} "
+        f"(95% CI: {ci_lower:.2f}-{ci_upper:.2f}), "
+        f"estimating {estimand_desc} ({estimand}), "
+        f"{adj_text}, based on {n_obs:,} observations. "
+        f"Exposure to {treatment_name} is associated with {direction} "
+        f"of the outcome. This association is {sig}. "
+        f"{balance_text} {eff_note}"
+    )
+
+
+def interpret_mediation(
+    mediator_name: str,
+    exposure_name: str,
+    outcome_name: str,
+    indirect: float,
+    direct: float,
+    total: float,
+    indirect_ci: tuple[float, float],
+    direct_ci: tuple[float, float],
+    sobel_p: float | None,
+    proportion_mediated: float | None,
+    method: str,
+    n_obs: int,
+    confounder_names: list[str],
+    weighted: bool = False,
+) -> str:
+    """Generate plain English interpretation of mediation analysis.
+
+    Args:
+        mediator_name: Name of the mediator variable.
+        exposure_name: Name of the exposure variable.
+        outcome_name: Name of the outcome variable.
+        indirect: Indirect effect (a*b or c-c').
+        direct: Direct effect (c').
+        total: Total effect (c).
+        indirect_ci: 95% CI for indirect effect (lower, upper).
+        direct_ci: 95% CI for direct effect (lower, upper).
+        sobel_p: Sobel test p-value (None for binary outcomes).
+        proportion_mediated: Proportion mediated (None when signs differ).
+        method: "product" or "difference".
+        n_obs: Number of observations.
+        confounder_names: Confounders adjusted for.
+        weighted: Whether survey weights were applied.
+
+    Returns:
+        Plain English interpretation string.
+    """
+    prefix = "Survey-weighted Baron-Kenny" if weighted else "Baron-Kenny"
+
+    # Indirect effect significance via bootstrap CI
+    indirect_sig = indirect_ci[0] > 0 or indirect_ci[1] < 0
+
+    # Direct effect significance via bootstrap CI
+    direct_sig = direct_ci[0] > 0 or direct_ci[1] < 0
+
+    # Classification
+    if indirect_sig and not direct_sig:
+        class_desc = (
+            f"The indirect effect through {mediator_name} is statistically significant "
+            f"while the direct effect is not, suggesting full mediation."
+        )
+    elif indirect_sig and direct_sig:
+        class_desc = (
+            f"Both the indirect effect through {mediator_name} and the direct effect "
+            f"are statistically significant, suggesting partial mediation."
+        )
+    else:
+        class_desc = (
+            f"The indirect effect through {mediator_name} is not statistically significant, "
+            f"suggesting no evidence of mediation."
+        )
+
+    # Proportion mediated text
+    if proportion_mediated is not None and indirect_sig:
+        prop_text = (
+            f"Approximately {proportion_mediated * 100:.1f}% of the total effect "
+            f"is mediated through {mediator_name}."
+        )
+    elif proportion_mediated is None and indirect_sig:
+        prop_text = (
+            "Proportion mediated could not be calculated because the indirect "
+            "and total effects have different signs."
+        )
+    else:
+        prop_text = ""
+
+    # Sobel test text
+    if sobel_p is not None:
+        if sobel_p < ALPHA_DEFAULT:
+            sobel_text = (
+                f"The Sobel test confirms the indirect effect is statistically significant "
+                f"(p = {sobel_p:.4f})."
+            )
+        else:
+            sobel_text = (
+                f"The Sobel test indicates the indirect effect is not statistically significant "
+                f"(p = {sobel_p:.4f})."
+            )
+    else:
+        sobel_text = (
+            "The Sobel test is not applicable for binary outcomes; "
+            "bootstrap confidence intervals are used instead."
+        )
+
+    # Adjustment text
+    if confounder_names:
+        adj_text = f"adjusted for {', '.join(confounder_names)}"
+    else:
+        adj_text = "unadjusted"
+
+    # Method note
+    if method == "difference":
+        method_note = (
+            "The difference method (c - c') was used for the indirect effect "
+            "because the outcome is binary."
+        )
+    else:
+        method_note = (
+            "The product of coefficients method (a x b) was used for the indirect effect."
+        )
+
+    parts = [
+        f"{prefix} mediation analysis ({adj_text}, n = {n_obs:,}) "
+        f"examined whether {mediator_name} mediates the effect of "
+        f"{exposure_name} on {outcome_name}.",
+        f"Total effect = {total:.4f}, Direct effect = {direct:.4f} "
+        f"(95% CI: {direct_ci[0]:.4f} to {direct_ci[1]:.4f}), "
+        f"Indirect effect = {indirect:.4f} "
+        f"(95% CI: {indirect_ci[0]:.4f} to {indirect_ci[1]:.4f}).",
+        class_desc,
+    ]
+
+    if prop_text:
+        parts.append(prop_text)
+    parts.append(sobel_text)
+    parts.append(method_note)
+
+    return " ".join(parts)

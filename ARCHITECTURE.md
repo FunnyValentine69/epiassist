@@ -105,6 +105,7 @@
 - E-value sensitivity analysis auto-computed from crude OR (and MH-adjusted OR when available)
 - Regression analysis tab: logistic (OR), linear (β), Poisson (IRR) via `core/regression.py`
 - Survey-weighted analysis: optional weight column for weighted descriptive stats (Tab 3) and weighted regression (Tab 5) using `freq_weights`
+- Propensity score analysis tab: IPTW-based causal inference with PS estimation, common support assessment, balance diagnostics (Love plot), bootstrap CIs, and E-value integration via `core/propensity_score.py`
 
 ### core/ (Business Logic)
 
@@ -243,6 +244,29 @@ def run_poisson_regression(df, outcome_col, exposure_col, confounder_cols, expos
     # exposure_effect, coefficients, model_fit (AIC/BIC/R²), interpretation
 ```
 
+#### propensity_score.py
+```python
+def estimate_propensity_scores(df, treatment_col, confounder_cols, treatment_positive, weight_col=None) -> dict
+def assess_common_support(ps_treated, ps_control) -> dict
+def calculate_iptw_weights(ps, treatment, estimand="ATE", stabilized=True, trim_quantile=0.0) -> dict
+def calculate_smd(treated_values, control_values, treated_weights=None, control_weights=None) -> float
+def balance_diagnostics(df, confounder_cols, treatment_binary, iptw_weights=None) -> dict
+def estimate_treatment_effect(df, outcome_col, treatment_binary, iptw_weights, outcome_type="binary", ...) -> dict
+def run_propensity_score_analysis(df, outcome_col, treatment_col, confounder_cols, ...) -> dict
+    # Full IPTW pipeline: PS estimation → common support → weights → balance → treatment effect
+    # Returns: ps_model, common_support, iptw, balance, treatment_effect, interpretation
+```
+
+#### mediation.py
+```python
+def fit_mediation_models(df, outcome_col, exposure_col, mediator_col, confounder_cols, exposure_positive, outcome_type="continuous", ...) -> dict
+def calculate_mediation_effects(a, b, c, c_prime, se_a, se_b, outcome_type="continuous") -> dict
+def bootstrap_mediation_ci(df, outcome_col, exposure_col, mediator_col, confounder_cols, exposure_positive, ..., n_boot=200) -> dict
+def run_mediation_analysis(df, outcome_col, exposure_col, mediator_col, confounder_cols, exposure_positive, ...) -> dict
+    # Baron-Kenny pipeline: 3 GLM models → effect decomposition → bootstrap CIs → interpretation
+    # Returns: models, effects, ci, n_observations, n_dropped, n_boot, interpretation
+```
+
 #### e_value.py
 ```python
 def calculate_e_value(point_estimate: float, ci_bound: float = None) -> dict
@@ -266,6 +290,8 @@ def interpret_mantel_haenszel(or_value: float, or_ci_lower: float, or_ci_upper: 
 def interpret_logistic_regression(exposure_name, or_value, ci_lower, ci_upper, p_value, confounder_names, n_obs, weighted=False) -> str
 def interpret_linear_regression(exposure_name, beta, ci_lower, ci_upper, p_value, confounder_names, n_obs, r_squared, weighted=False) -> str
 def interpret_poisson_regression(exposure_name, irr, ci_lower, ci_upper, p_value, confounder_names, n_obs, weighted=False) -> str
+def interpret_propensity_score(estimand, effect_value, ci_lower, ci_upper, outcome_type, treatment_name, confounder_names, n_obs, effective_n, all_balanced, n_balanced, n_total_covariates, weighted=False) -> str
+def interpret_mediation(mediator_name, exposure_name, outcome_name, indirect, direct, total, indirect_ci, direct_ci, sobel_p, proportion_mediated, method, n_obs, confounder_names, weighted=False) -> str
 ```
 
 #### constants.py
@@ -294,6 +320,7 @@ DIFFERENCE_MEASURES = {"MD", "RD", "beta"}
 META_MEASURE_LABELS = {"OR": "Odds Ratio", ...}
 STANDARD_POPULATIONS = {"US 2000": [...], "WHO World": [...], "Segi World": [...]}
 RATE_MULTIPLIERS = {"per 1,000": 1000, "per 10,000": 10000, "per 100,000": 100000}
+SMD_BALANCE_THRESHOLD = 0.1  # Propensity score covariate balance (Austin 2009)
 ```
 
 ## Data Flow Diagrams
@@ -516,6 +543,18 @@ st.session_state = {
     # Regression Analysis (Data Analysis Tab 5)
     "data_reg_model_type": str,            # Selected model: "Logistic (OR)" | "Linear (β)" | "Poisson (IRR)"
     "data_reg_result": dict | None,        # Last regression result
+
+    # Propensity Score Analysis (Data Analysis Tab 6)
+    "data_ps_estimand": str,               # "ATE" or "ATT"
+    "data_ps_outcome_type": str,           # "Binary" or "Continuous"
+    "data_ps_stabilized": bool,            # Stabilized weights toggle
+    "data_ps_trim": float,                 # Trimming quantile (0-0.05)
+    "data_ps_n_boot": int,                 # Bootstrap iterations
+    "data_ps_result": dict | None,         # Full PS analysis result
+
+    # Mediation Analysis (Data Analysis Tab 7)
+    "data_mediator_cols": list[str],       # Selected mediator columns
+    "data_med_result": dict | None,        # Full mediation analysis result
 }
 ```
 

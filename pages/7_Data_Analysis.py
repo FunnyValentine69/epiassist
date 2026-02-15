@@ -16,6 +16,8 @@ from core.data_analyzer import (
     weighted_stats_numeric,
 )
 from core.e_value import calculate_e_value_for_or
+from core.mediation import run_mediation_analysis
+from core.propensity_score import run_propensity_score_analysis
 from core.regression import (
     run_linear_regression,
     run_logistic_regression,
@@ -52,9 +54,10 @@ statistics, and generate 2x2 cross-tabulations with effect estimates.
 st.divider()
 
 # --- Tabs ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "Upload & Preview", "Variable Roles", "Descriptive Statistics",
-    "Cross-Tabulation", "Regression Analysis",
+    "Cross-Tabulation", "Regression Analysis", "Propensity Score",
+    "Mediation Analysis",
 ])
 
 # --- Tab 1: Upload & Preview ---
@@ -102,7 +105,8 @@ with tab1:
         for key in ["data_outcome_col", "data_outcome_positive",
                      "data_exposure_col", "data_exposure_positive",
                      "data_confounder_cols", "data_weight_col",
-                     "data_reg_result"]:
+                     "data_reg_result", "data_ps_result",
+                     "data_mediator_cols", "data_med_result"]:
             st.session_state.pop(key, None)
 
     # Clear button
@@ -241,12 +245,40 @@ with tab2:
             )
             st.session_state.data_confounder_cols = confounder_cols
 
+            # Mediator columns
+            mediator_remaining = [c for c in remaining if c not in confounder_cols]
+
+            # DAG-based mediator suggestions
+            dag_mediator_defaults = []
+            if "dag_engine" in st.session_state:
+                try:
+                    dag_mediators = st.session_state.dag_engine.get_nodes_by_type("mediator")
+                    if dag_mediators:
+                        matched = match_columns_to_dag_nodes(mediator_remaining, dag_mediators)
+                        if matched:
+                            dag_mediator_defaults = list(matched.values())
+                            st.info(
+                                "DAG suggests mediators: "
+                                + ", ".join(f"**{n}** → `{c}`" for n, c in matched.items())
+                            )
+                except Exception:
+                    pass
+
+            mediator_cols = st.multiselect(
+                "Mediator variables (optional — for mediation analysis)",
+                mediator_remaining,
+                default=[d for d in dag_mediator_defaults if d in mediator_remaining],
+                key="data_mediator_cols_select",
+            )
+            st.session_state.data_mediator_cols = mediator_cols
+
             # Weight column (survey weights)
             numeric_cols = [c for c in all_columns
                            if pd.api.types.is_numeric_dtype(df_roles[c])
                            and c != st.session_state.get("data_outcome_col")
                            and c != st.session_state.get("data_exposure_col")
-                           and c not in confounder_cols]
+                           and c not in confounder_cols
+                           and c not in mediator_cols]
             weight_col = st.selectbox(
                 "Weight column (optional — survey weights)",
                 ["(none)"] + numeric_cols,
@@ -882,3 +914,391 @@ with tab5:
             # Interpretation
             with st.expander("Interpretation", expanded=True):
                 st.markdown(reg_result["interpretation"])
+
+# --- Tab 6: Propensity Score Analysis ---
+with tab6:
+    if "data_df" not in st.session_state:
+        st.info("Upload data in the first tab to begin propensity score analysis.")
+    elif "data_outcome_col" not in st.session_state or "data_exposure_col" not in st.session_state:
+        st.warning("Assign outcome and exposure variables in the **Variable Roles** tab.")
+    elif not st.session_state.get("data_confounder_cols"):
+        st.warning(
+            "Assign at least one confounder in the **Variable Roles** tab. "
+            "Propensity scores require confounders to adjust for."
+        )
+    else:
+        ps_df = st.session_state.data_df
+        ps_outcome = st.session_state.data_outcome_col
+        ps_treatment = st.session_state.data_exposure_col
+        ps_confounders = st.session_state.data_confounder_cols
+        ps_outcome_pos = st.session_state.get("data_outcome_positive")
+        ps_treatment_pos = st.session_state.get("data_exposure_positive")
+        ps_weight_col = st.session_state.get("data_weight_col")
+
+        st.markdown("### Settings")
+        col_est, col_opts = st.columns(2)
+        with col_est:
+            ps_estimand = st.radio(
+                "Estimand", ["ATE", "ATT"], horizontal=True,
+                key="data_ps_estimand",
+                help="ATE = average effect in full population. ATT = average effect among treated.",
+            )
+            ps_outcome_type = st.radio(
+                "Outcome type", ["Binary", "Continuous"], horizontal=True,
+                key="data_ps_outcome_type",
+            )
+        with col_opts:
+            ps_stabilized = st.checkbox(
+                "Stabilized weights", value=True, key="data_ps_stabilized",
+                help="Reduces weight variance without introducing bias (recommended).",
+            )
+            ps_trim = st.slider(
+                "Trimming quantile", 0.0, 0.05, 0.0, 0.01,
+                key="data_ps_trim",
+                help="Clip extreme propensity scores at this quantile (0 = no trimming).",
+            )
+            ps_n_boot = st.number_input(
+                "Bootstrap iterations", 50, 1000, 200, step=50,
+                key="data_ps_n_boot",
+                help="More iterations = narrower CIs but slower.",
+            )
+
+        st.info(
+            f"**Treatment:** {ps_treatment}  \n"
+            f"**Outcome:** {ps_outcome}  \n"
+            f"**Confounders:** {', '.join(ps_confounders)}  \n"
+            f"**Estimand:** {ps_estimand}"
+        )
+
+        if ps_treatment_pos is None:
+            st.warning(
+                "Set a **positive value** for the exposure variable in the "
+                "**Variable Roles** tab to define the treated group."
+            )
+
+        if st.button("Run Propensity Score Analysis", key="data_ps_run_btn", disabled=ps_treatment_pos is None):
+            st.session_state.pop("data_ps_result", None)
+            with st.spinner("Fitting PS model and bootstrapping CIs..."):
+                try:
+                    ps_result = run_propensity_score_analysis(
+                        ps_df, ps_outcome, ps_treatment, ps_confounders,
+                        treatment_positive=ps_treatment_pos,
+                        outcome_positive=ps_outcome_pos,
+                        outcome_type=ps_outcome_type.lower(),
+                        estimand=ps_estimand,
+                        stabilized=ps_stabilized,
+                        trim_quantile=ps_trim,
+                        weight_col=ps_weight_col,
+                        n_bootstrap=ps_n_boot,
+                    )
+                    st.session_state.data_ps_result = ps_result
+                except ValueError as e:
+                    st.error(f"Propensity score error: {e}")
+                except Exception as e:
+                    st.error(f"Unexpected error: {e}")
+
+        if "data_ps_result" in st.session_state:
+            ps_result = st.session_state.data_ps_result
+            te = ps_result["treatment_effect"]
+
+            # Convergence warning
+            if not ps_result["ps_model"]["converged"]:
+                st.warning(
+                    "The propensity score model did not converge. "
+                    "Results may be unreliable. Consider reducing confounders."
+                )
+
+            # 1. Treatment Effect
+            st.markdown("### Treatment Effect")
+            effect_label = "OR" if te["outcome_type"] == "binary" else "Mean Difference"
+            te_cols = st.columns(3)
+            with te_cols[0]:
+                st.metric(
+                    f"IPTW-adjusted {effect_label} ({te['estimand']})",
+                    f"{te['value']:.3f}",
+                )
+            with te_cols[1]:
+                import math
+                if math.isfinite(te["ci_lower"]) and math.isfinite(te["ci_upper"]):
+                    st.metric("95% CI", f"{te['ci_lower']:.3f} – {te['ci_upper']:.3f}")
+                else:
+                    st.metric("95% CI", "Could not compute")
+                    st.warning("Bootstrap CIs failed to converge. Consider simplifying the model or trimming extreme PS.")
+            with te_cols[2]:
+                st.metric("Effective N", f"{te['effective_n']:.0f}")
+
+            # 2. PS Distribution Histogram
+            st.markdown("### Propensity Score Distribution")
+            ps_scores = ps_result["ps_model"]["ps_scores"]
+            t_binary = ps_result["ps_model"]["treatment_binary"]
+
+            fig_ps = go.Figure()
+            fig_ps.add_trace(go.Histogram(
+                x=ps_scores[t_binary == 1], name="Treated",
+                opacity=0.6, marker_color="#FF6B6B", nbinsx=30,
+            ))
+            fig_ps.add_trace(go.Histogram(
+                x=ps_scores[t_binary == 0], name="Control",
+                opacity=0.6, marker_color="#4ECDC4", nbinsx=30,
+            ))
+            fig_ps.update_layout(
+                barmode="overlay", xaxis_title="Propensity Score",
+                yaxis_title="Count", height=350, margin=dict(t=30),
+            )
+            st.plotly_chart(fig_ps, use_container_width=True)
+
+            # 3. Common Support
+            cs = ps_result["common_support"]
+            if not cs["sufficient"]:
+                st.warning(cs["warning"])
+            else:
+                st.success(f"Good common support: {cs['overlap_pct']:.0f}% of observations in overlap region.")
+
+            # 4. Love Plot (Balance Diagnostics)
+            st.markdown("### Covariate Balance (Love Plot)")
+            balance = ps_result["balance"]
+            bal_data = balance["diagnostics"]
+
+            fig_love = go.Figure()
+            var_names = [d["variable"] for d in bal_data]
+            smd_before = [d["smd_before"] for d in bal_data]
+            smd_after = [d["smd_after"] for d in bal_data]
+
+            fig_love.add_trace(go.Scatter(
+                x=smd_before, y=var_names, mode="markers",
+                name="Before IPTW", marker=dict(color="#FF6B6B", size=10),
+            ))
+            fig_love.add_trace(go.Scatter(
+                x=smd_after, y=var_names, mode="markers",
+                name="After IPTW", marker=dict(color="#4ECDC4", size=10),
+            ))
+            fig_love.add_vline(
+                x=balance["threshold"], line_dash="dash",
+                line_color="gray", annotation_text=f"SMD = {balance['threshold']}",
+            )
+            fig_love.update_layout(
+                xaxis_title="Standardized Mean Difference",
+                height=max(250, len(var_names) * 40),
+                margin=dict(t=30),
+            )
+            st.plotly_chart(fig_love, use_container_width=True)
+
+            # 5. Balance Table
+            bal_df = pd.DataFrame(bal_data)
+            st.dataframe(bal_df, use_container_width=True, hide_index=True)
+
+            # 6. Weight Summary
+            st.markdown("### Weight Summary")
+            ws = ps_result["iptw"]["weight_summary"]
+            w_cols = st.columns(4)
+            with w_cols[0]:
+                st.metric("Mean Weight", f"{ws['mean']:.2f}")
+            with w_cols[1]:
+                st.metric("Max Weight", f"{ws['max']:.2f}")
+            with w_cols[2]:
+                st.metric("Effective N", f"{ws['effective_n']:.0f}")
+            with w_cols[3]:
+                st.metric("N Observations", f"{ps_result['ps_model']['n_observations']:,}")
+
+            # 7. E-Value (binary outcomes only)
+            if (
+                te["outcome_type"] == "binary"
+                and te["value"] is not None
+                and math.isfinite(te["ci_lower"])
+                and math.isfinite(te["ci_upper"])
+            ):
+                ps_e = calculate_e_value_for_or(
+                    te["value"], te["ci_lower"], te["ci_upper"]
+                )
+                if ps_e.get("e_value") is not None:
+                    st.divider()
+                    st.markdown("### E-Value: Residual Unmeasured Confounding")
+                    e_cols = st.columns(2)
+                    with e_cols[0]:
+                        st.metric("E-value (point)", f"{ps_e['e_value']:.2f}")
+                    with e_cols[1]:
+                        if ps_e.get("e_value_ci") is not None:
+                            st.metric("E-value (CI)", f"{ps_e['e_value_ci']:.2f}")
+                    with st.expander("E-Value Interpretation"):
+                        st.markdown(ps_e["interpretation"])
+
+            # 8. Interpretation
+            with st.expander("Interpretation", expanded=True):
+                st.markdown(ps_result["interpretation"])
+
+# --- Tab 7: Mediation Analysis ---
+with tab7:
+    if "data_df" not in st.session_state:
+        st.info("Upload data in the first tab to begin mediation analysis.")
+    elif "data_outcome_col" not in st.session_state or "data_exposure_col" not in st.session_state:
+        st.warning("Assign outcome and exposure variables in the **Variable Roles** tab.")
+    elif not st.session_state.get("data_mediator_cols"):
+        st.warning(
+            "Assign at least one mediator in the **Variable Roles** tab. "
+            "Mediation analysis requires a mediator variable."
+        )
+    else:
+        med_df = st.session_state.data_df
+        med_outcome = st.session_state.data_outcome_col
+        med_exposure = st.session_state.data_exposure_col
+        med_confounders = st.session_state.get("data_confounder_cols", [])
+        med_mediators = st.session_state.data_mediator_cols
+        med_outcome_pos = st.session_state.get("data_outcome_positive")
+        med_exposure_pos = st.session_state.get("data_exposure_positive")
+        med_weight_col = st.session_state.get("data_weight_col")
+
+        st.markdown("### Baron-Kenny Mediation Analysis")
+        st.markdown(
+            "Decompose the total effect of the exposure on the outcome into "
+            "**direct** and **indirect** (mediated) effects."
+        )
+
+        # Settings
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            med_selected = st.selectbox(
+                "Mediator to analyze",
+                med_mediators,
+                key="data_med_selected",
+            )
+            med_outcome_type = st.radio(
+                "Outcome type",
+                ["Continuous", "Binary"],
+                key="data_med_outcome_type",
+                horizontal=True,
+            )
+        with col_s2:
+            med_n_boot = st.number_input(
+                "Bootstrap iterations",
+                min_value=50, max_value=1000, value=200, step=50,
+                key="data_med_n_boot",
+            )
+
+        st.info(
+            f"**Exposure:** {med_exposure} | **Mediator:** {med_selected} | "
+            f"**Outcome:** {med_outcome} | "
+            f"**Confounders:** {', '.join(med_confounders) if med_confounders else 'none'}"
+        )
+
+        if med_exposure_pos is None:
+            st.warning(
+                "Set a **positive value** for the exposure variable in the "
+                "**Variable Roles** tab to define the exposed group."
+            )
+
+        if st.button(
+            "Run Mediation Analysis",
+            key="data_med_run_btn",
+            disabled=med_exposure_pos is None,
+        ):
+            st.session_state.pop("data_med_result", None)
+            is_binary = med_outcome_type == "Binary"
+            with st.spinner("Fitting mediation models and bootstrapping CIs..."):
+                try:
+                    med_result = run_mediation_analysis(
+                        med_df, med_outcome, med_exposure, med_selected,
+                        med_confounders,
+                        exposure_positive=med_exposure_pos,
+                        outcome_type="binary" if is_binary else "continuous",
+                        binarize_outcome=is_binary,
+                        outcome_positive=med_outcome_pos if is_binary else None,
+                        weight_col=med_weight_col,
+                        n_boot=int(med_n_boot),
+                    )
+                    st.session_state.data_med_result = med_result
+                except ValueError as e:
+                    st.error(f"Mediation analysis error: {e}")
+                except Exception as e:
+                    st.error(f"Unexpected error: {e}")
+
+        # Display results
+        if "data_med_result" in st.session_state:
+            med_r = st.session_state.data_med_result
+            models = med_r["models"]
+            effects = med_r["effects"]
+            ci = med_r["ci"]
+
+            # Convergence warnings
+            for model_name, model_data in models.items():
+                if not model_data.get("converged", True):
+                    st.warning(f"Model '{model_name}' did not converge. Results may be unreliable.")
+
+            # Effect decomposition
+            st.markdown("#### Effect Decomposition")
+            e_col1, e_col2, e_col3 = st.columns(3)
+            with e_col1:
+                st.metric("Total Effect (c)", f"{effects['total']:.4f}")
+                lo, hi = ci["total_ci"]
+                st.caption(f"95% CI: {lo:.4f} to {hi:.4f}")
+            with e_col2:
+                st.metric("Direct Effect (c')", f"{effects['direct']:.4f}")
+                lo, hi = ci["direct_ci"]
+                st.caption(f"95% CI: {lo:.4f} to {hi:.4f}")
+            with e_col3:
+                st.metric("Indirect Effect", f"{effects['indirect']:.4f}")
+                lo, hi = ci["indirect_ci"]
+                st.caption(f"95% CI: {lo:.4f} to {hi:.4f}")
+
+            # Sobel test and proportion mediated
+            st.markdown("#### Significance & Proportion Mediated")
+            s_col1, s_col2, s_col3 = st.columns(3)
+            with s_col1:
+                if effects["sobel_z"] is not None:
+                    st.metric("Sobel z", f"{effects['sobel_z']:.3f}")
+                else:
+                    st.metric("Sobel z", "N/A (binary)")
+            with s_col2:
+                if effects["sobel_p"] is not None:
+                    st.metric("Sobel p-value", f"{effects['sobel_p']:.4f}")
+                else:
+                    st.metric("Sobel p-value", "N/A (binary)")
+            with s_col3:
+                if effects["proportion_mediated"] is not None:
+                    st.metric(
+                        "Proportion Mediated",
+                        f"{effects['proportion_mediated'] * 100:.1f}%",
+                    )
+                else:
+                    st.metric("Proportion Mediated", "N/A")
+
+            # Path coefficients
+            st.markdown("#### Path Coefficients")
+            path_data = {
+                "Path": ["a (exposure → mediator)", "b (mediator → outcome)",
+                         "c (total effect)", "c' (direct effect)"],
+                "Coefficient": [
+                    models["a_path"]["coef_a"],
+                    models["direct"]["coef_b"],
+                    models["total"]["coef_c"],
+                    models["direct"]["coef_c_prime"],
+                ],
+                "SE": [
+                    models["a_path"]["se_a"],
+                    models["direct"]["se_b"],
+                    models["total"]["se_c"],
+                    models["direct"]["se_c_prime"],
+                ],
+                "p-value": [
+                    models["a_path"]["p_a"],
+                    models["direct"]["p_b"],
+                    models["total"]["p_c"],
+                    models["direct"]["p_c_prime"],
+                ],
+            }
+            path_df = pd.DataFrame(path_data)
+            path_df["Coefficient"] = path_df["Coefficient"].map("{:.4f}".format)
+            path_df["SE"] = path_df["SE"].map("{:.4f}".format)
+            path_df["p-value"] = path_df["p-value"].map("{:.4f}".format)
+            st.dataframe(path_df, use_container_width=True, hide_index=True)
+
+            # Method and sample info
+            st.caption(
+                f"Method: {effects['method']} | "
+                f"N = {med_r['n_observations']:,} | "
+                f"Dropped: {med_r['n_dropped']:,} | "
+                f"Bootstrap iterations: {med_r['n_boot']}"
+            )
+
+            # Interpretation
+            with st.expander("Interpretation", expanded=True):
+                st.markdown(med_r["interpretation"])
