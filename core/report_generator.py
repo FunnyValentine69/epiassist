@@ -77,8 +77,11 @@ def _safe(value: object, fmt: str = "") -> str:
     """Safely format a value for PDF display."""
     if value is None:
         return "N/A"
-    if fmt and isinstance(value, (int, float)):
-        return f"{value:{fmt}}"
+    if fmt:
+        try:
+            return f"{value:{fmt}}"
+        except (ValueError, TypeError):
+            return str(value)
     return str(value)
 
 
@@ -195,8 +198,9 @@ def _add_dag_summary(pdf: FPDF, state: dict) -> None:
 
     # Node table
     node_rows = []
-    for name, data in nodes:
-        node_rows.append([name, data.get("node_type", "unknown")])
+    for name in nodes:
+        node_type = engine.graph.nodes[name].get("type", "unknown")
+        node_rows.append([name, node_type])
     _render_table(pdf, ["Node", "Type"], node_rows)
 
 
@@ -218,7 +222,7 @@ def _add_effect_estimates(pdf: FPDF, state: dict) -> None:
         ("rd", "Risk Difference"),
     ]:
         data = results.get(key)
-        if data:
+        if data is not None:
             rows.append([
                 label,
                 _safe(data.get("value"), ".4f"),
@@ -226,7 +230,7 @@ def _add_effect_estimates(pdf: FPDF, state: dict) -> None:
             ])
 
     chi = results.get("chi_square")
-    if chi:
+    if chi is not None:
         rows.append([
             "Chi-square",
             _safe(chi.get("statistic"), ".4f"),
@@ -323,7 +327,7 @@ def _add_propensity_score(pdf: FPDF, state: dict) -> None:
 
     # Treatment effect
     te = ps.get("treatment_effect", {})
-    if te:
+    if te is not None:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(w=0, h=8, text="Treatment Effect")
         pdf.ln(8)
@@ -499,7 +503,7 @@ def _add_meta_analysis(pdf: FPDF, state: dict) -> None:
 
     # Heterogeneity
     het = meta.get("heterogeneity", {})
-    if het:
+    if het is not None:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(w=0, h=8, text="Heterogeneity")
         pdf.ln(8)
