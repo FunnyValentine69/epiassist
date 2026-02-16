@@ -33,6 +33,8 @@ An epidemiological research assistant for causal inference, statistical analysis
 
 - **Data Analysis**: Upload datasets (CSV, Excel, or paste), assign outcome/exposure/confounder roles, view descriptive statistics with grouped comparisons and histograms, and auto-generate 2x2 cross-tabulations with OR, RR, RD, and Chi-square results.
 
+- **Export & Report**: Generate publication-ready manuscript Methods sections from your analysis session. Download as Markdown or copy to clipboard. PDF report export coming soon.
+
 ## Installation
 
 ### Prerequisites
