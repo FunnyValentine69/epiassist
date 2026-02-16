@@ -33,7 +33,7 @@ An epidemiological research assistant for causal inference, statistical analysis
 
 - **Data Analysis**: Upload datasets (CSV, Excel, or paste), assign outcome/exposure/confounder roles, view descriptive statistics with grouped comparisons and histograms, and auto-generate 2x2 cross-tabulations with OR, RR, RD, and Chi-square results.
 
-- **Export & Report**: Generate publication-ready manuscript Methods sections from your analysis session. Download as Markdown or copy to clipboard. PDF report export coming soon.
+- **Export & Report**: Generate publication-ready manuscript Methods sections from your analysis session. Download as Markdown or copy to clipboard. Export a full PDF report covering all completed analyses (data summary, regression, propensity scores, mediation, meta-analysis, and more).
 
 ## Installation
 
@@ -124,6 +124,7 @@ Investigate the relationship between hearing loss and employment status using NH
 - **PyMuPDF** - PDF text extraction
 - **LangExtract** - Optional LLM-based stat extraction
 - **Plotly** - Interactive visualizations
+- **fpdf2** - PDF report generation
 - **Pandas** - Data manipulation
 
 ## Optional: AI-Enhanced Extraction (Ollama)

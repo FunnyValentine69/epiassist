@@ -102,7 +102,7 @@
 - [x] Manuscript generator (methods section templates) — Page 8 Export & Report
 - [x] Propensity score calculator
 - [x] Mediation analysis module
-- [ ] Export analysis sessions to PDF report
+- [x] Export analysis sessions to PDF report — Page 8 Export & Report
 
 ## Phase 2: Data Analysis Module (Complete)
 - [x] Data upload interface (CSV, Excel, paste)

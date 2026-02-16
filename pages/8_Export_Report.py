@@ -4,6 +4,7 @@ from datetime import date
 
 import streamlit as st
 
+from core.report_generator import generate_report
 from utils.methods_generator import generate_methods_section
 
 st.set_page_config(page_title="Export & Report - EpiAssist", layout="wide")
@@ -55,8 +56,26 @@ if "export_methods_text" in st.session_state:
 st.divider()
 
 # -----------------------------------------------------------------------
-# Section 2 — PDF Report Export (placeholder for PR 2)
+# Section 2 — PDF Report Export
 # -----------------------------------------------------------------------
 
 st.header("PDF Report Export")
-st.info("PDF report export coming soon.")
+
+# Check if at least one analysis result exists
+_result_keys = [
+    "data_df", "stats_results", "data_reg_result",
+    "data_ps_result", "data_med_result", "meta_results",
+    "paper_results", "e_value_result",
+]
+_has_results = any(k in st.session_state for k in _result_keys)
+
+if _has_results:
+    st.download_button(
+        label="Download PDF Report",
+        data=generate_report(dict(st.session_state)),
+        file_name=f"epiassist_report_{date.today().isoformat()}.pdf",
+        mime="application/pdf",
+        type="primary",
+    )
+else:
+    st.info("Run at least one analysis to enable PDF export.")
