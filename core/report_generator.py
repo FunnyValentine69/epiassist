@@ -24,8 +24,9 @@ class EpiAssistReport(FPDF):
         if self.page_no() == 1:
             return
         self.set_font("Helvetica", "B", 10)
-        self.cell(w=0, h=8, text="EpiAssist Analysis Report", align="L")
-        self.cell(w=0, h=8, text=date.today().strftime("%Y-%m-%d"), align="R")
+        half = self.epw / 2
+        self.cell(w=half, h=8, text="EpiAssist Analysis Report", align="L")
+        self.cell(w=half, h=8, text=date.today().strftime("%Y-%m-%d"), align="R")
         self.ln(12)
 
     def footer(self) -> None:
