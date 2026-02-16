@@ -29,8 +29,11 @@ st.caption(
 )
 
 if st.button("Generate Methods Section", type="primary"):
-    methods_text = generate_methods_section(dict(st.session_state))
-    st.session_state.export_methods_text = methods_text
+    try:
+        methods_text = generate_methods_section(dict(st.session_state))
+        st.session_state.export_methods_text = methods_text
+    except Exception as exc:
+        st.error(f"Error generating Methods section: {exc}")
 
 if "export_methods_text" in st.session_state:
     text = st.session_state.export_methods_text
