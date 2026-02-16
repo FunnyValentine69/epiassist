@@ -68,24 +68,25 @@ st.header("PDF Report Export")
 _result_keys = [
     "data_df", "stats_results", "data_reg_result",
     "data_ps_result", "data_med_result", "meta_results",
-    "paper_results", "e_value_result",
+    "paper_results",
 ]
 _has_results = any(k in st.session_state for k in _result_keys)
 
 if _has_results:
-    try:
-        _pdf_bytes = generate_report(dict(st.session_state))
-    except Exception as exc:
-        st.error(f"Error generating PDF report: {exc}")
-        _pdf_bytes = None
+    if st.button("Generate PDF Report", type="primary"):
+        try:
+            st.session_state["_pdf_report_bytes"] = generate_report(
+                dict(st.session_state)
+            )
+        except Exception as exc:
+            st.error(f"Error generating PDF report: {exc}")
 
-    if _pdf_bytes is not None:
+    if "_pdf_report_bytes" in st.session_state:
         st.download_button(
             label="Download PDF Report",
-            data=_pdf_bytes,
+            data=st.session_state["_pdf_report_bytes"],
             file_name=f"epiassist_report_{date.today().isoformat()}.pdf",
             mime="application/pdf",
-            type="primary",
         )
 else:
     st.info("Run at least one analysis to enable PDF export.")
