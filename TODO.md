@@ -99,7 +99,7 @@
 - [x] Forest plot generation
 
 ### Long-term
-- [ ] Manuscript generator (methods section templates)
+- [x] Manuscript generator (methods section templates) — Page 8 Export & Report
 - [x] Propensity score calculator
 - [x] Mediation analysis module
 - [ ] Export analysis sessions to PDF report

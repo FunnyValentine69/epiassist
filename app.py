@@ -107,6 +107,7 @@ features = {
     "Power Analysis": "Calculate required sample sizes, generate power curves, and perform E-value sensitivity analysis for unmeasured confounding.",
     "Meta-Analysis": "Pool effect estimates from multiple studies using fixed-effect or random-effects models. Generate forest plots and funnel plots for publication bias assessment.",
     "Data Analysis": "Upload datasets (CSV, Excel, or paste), assign variable roles, explore descriptive statistics, and auto-generate 2x2 cross-tabulations with effect estimates.",
+    "Export & Report": "Generate publication-ready manuscript Methods sections and download PDF reports from your analysis session.",
 }
 
 for feature, description in features.items():

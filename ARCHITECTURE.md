@@ -107,6 +107,12 @@
 - Survey-weighted analysis: optional weight column for weighted descriptive stats (Tab 3) and weighted regression (Tab 5) using `freq_weights`
 - Propensity score analysis tab: IPTW-based causal inference with PS estimation, common support assessment, balance diagnostics (Love plot), bootstrap CIs, and E-value integration via `core/propensity_score.py`
 
+#### 8_Export_Report.py
+- Manuscript Methods section generator (template-based, no LLM)
+- Calls `utils/methods_generator.py` with session state snapshot
+- Markdown download and copy-to-clipboard for generated text
+- PDF report export (placeholder — see PR 2)
+
 ### core/ (Business Logic)
 
 #### dag_engine.py
@@ -292,6 +298,14 @@ def interpret_linear_regression(exposure_name, beta, ci_lower, ci_upper, p_value
 def interpret_poisson_regression(exposure_name, irr, ci_lower, ci_upper, p_value, confounder_names, n_obs, weighted=False) -> str
 def interpret_propensity_score(estimand, effect_value, ci_lower, ci_upper, outcome_type, treatment_name, confounder_names, n_obs, effective_n, all_balanced, n_balanced, n_total_covariates, weighted=False) -> str
 def interpret_mediation(mediator_name, exposure_name, outcome_name, indirect, direct, total, indirect_ci, direct_ci, sobel_p, proportion_mediated, method, n_obs, confounder_names, weighted=False) -> str
+```
+
+#### methods_generator.py
+```python
+def generate_methods_section(state: dict) -> str
+    # Template-based Methods section from session state
+    # Sections: study design, descriptive, cross-tab, regression,
+    #           propensity score, mediation, meta-analysis, sensitivity, software
 ```
 
 #### constants.py
@@ -555,6 +569,9 @@ st.session_state = {
     # Mediation Analysis (Data Analysis Tab 7)
     "data_mediator_cols": list[str],       # Selected mediator columns
     "data_med_result": dict | None,        # Full mediation analysis result
+
+    # Export & Report (Page 8)
+    "export_methods_text": str,            # Generated manuscript Methods section
 }
 ```
 
