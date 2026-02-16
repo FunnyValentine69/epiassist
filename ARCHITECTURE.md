@@ -111,7 +111,7 @@
 - Manuscript Methods section generator (template-based, no LLM)
 - Calls `utils/methods_generator.py` with session state snapshot
 - Markdown download and copy-to-clipboard for generated text
-- PDF report export (placeholder — see PR 2)
+- PDF report export via `core/report_generator.py` (fpdf2, text + tables, no figures)
 
 ### core/ (Business Logic)
 
@@ -277,6 +277,16 @@ def run_mediation_analysis(df, outcome_col, exposure_col, mediator_col, confound
 ```python
 def calculate_e_value(point_estimate: float, ci_bound: float = None) -> dict
 def interpret_e_value(e_value: float) -> str
+```
+
+#### report_generator.py
+```python
+def generate_report(session_state: dict) -> bytes
+    # PDF report via fpdf2 (text + tables, no figures)
+    # Sections: title page, data summary, DAG, effect estimates,
+    #           regression, propensity score, mediation, meta-analysis,
+    #           paper summary, methods section
+    # Each section guarded by session state key presence
 ```
 
 ### utils/ (Shared Utilities)
