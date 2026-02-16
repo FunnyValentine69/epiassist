@@ -145,8 +145,11 @@ def _section_regression(state: dict) -> str | None:
     if weighted:
         parts.append("Survey sampling weights were incorporated.")
 
-    if n_obs:
-        parts.append(f"The analytic sample included {n_obs:,} observations.")
+    if n_obs is not None:
+        try:
+            parts.append(f"The analytic sample included {int(n_obs):,} observations.")
+        except (ValueError, TypeError):
+            parts.append(f"The analytic sample included {n_obs} observations.")
 
     parts.append("All models were fit using generalized linear models (GLM).")
 
