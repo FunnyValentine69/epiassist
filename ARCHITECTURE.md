@@ -624,6 +624,34 @@ python scripts/diagnose_extraction.py ./my_papers  # Custom folder
 - Normalizes and compares paper adjustment set vs DAG adjustment set
 - Shows overlap, DAG-only (warning), and paper-only (info) in an expander
 
+## Testing
+
+563 tests across 19 files. No Streamlit or network dependencies in any test.
+
+### Coverage Map
+
+| Test File | Source Module | Tests | Focus |
+|-----------|--------------|-------|-------|
+| `test_stats_calculator.py` | `stats_calculator.py` | 29 | OR, RR, RD, Chi-square, CI, NNT |
+| `test_mh_calculator.py` | `stats_calculator.py` | 18 | Mantel-Haenszel adjusted OR/RR |
+| `test_power_calculator.py` | `power_calculator.py` | 27 | Sample size, power, curves, OR sizing |
+| `test_dag_engine.py` | `dag_engine.py` | 32 | DAG class API, serialization, queries |
+| `test_confounder_detector.py` | `confounder_detector.py` | 21 | Graph analysis (confounders, paths, adjustment) |
+| `test_confounder_matching.py` | `confounder_detector.py` | 15 | Name normalization, column matching |
+| `test_paper_parser.py` | `paper_parser.py` | 55 | Regex extraction, PDF construction |
+| `test_data_analyzer.py` | `data_analyzer.py` | 30 | Data upload, descriptive stats, cross-tab |
+| `test_meta_analysis.py` | `meta_analysis.py` | 36 | Fixed/random effects, heterogeneity |
+| `test_regression.py` | `regression.py` | 22 | Logistic, linear, Poisson models |
+| `test_propensity_score.py` | `propensity_score.py` | 50 | IPTW, balance, treatment effects |
+| `test_mediation.py` | `mediation.py` | 42 | Baron-Kenny, indirect/direct effects |
+| `test_e_value_integration.py` | `e_value.py` | 12 | E-value sensitivity analysis |
+| `test_direct_standardization.py` | `direct_standardization.py` | 28 | Age-adjusted rates |
+| `test_smr_calculator.py` | `smr_calculator.py` | 22 | Standardized mortality ratios |
+| `test_report_generator.py` | `report_generator.py` | 28 | Methods section + PDF generation |
+| `test_llm_extractor.py` | `llm_extractor.py` | 27 | LLM extraction (mocked Ollama) |
+| `test_methods_generator.py` | `methods_generator.py` | 39 | Methods text generation |
+| `test_smoke.py` | *(integration)* | 10 | Module imports + cross-module flows |
+
 ## Error Handling Strategy
 
 1. **Input Validation**: All user inputs validated at UI layer before passing to core

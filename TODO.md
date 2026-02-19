@@ -92,12 +92,6 @@
 
 ## Roadmap
 
-### Medium-term
-- [ ] NHANES data loader
-- [ ] PubMed API integration for paper search
-- [x] Meta-analysis calculator
-- [x] Forest plot generation
-
 ### Long-term
 - [x] Manuscript generator (methods section templates) — Page 8 Export & Report
 - [x] Propensity score calculator
@@ -133,7 +127,7 @@
 - [x] Data Analysis Tab 7 with full UI (settings, effect decomposition, path coefficients, interpretation)
 - [x] 42 tests across 6 classes covering data prep, model fitting, effects, bootstrap, full pipeline, interpretation
 
-## Phase 2.1: Basic Calculators (In Progress)
+## Phase 2.1: Basic Calculators (Complete)
 - [x] Mantel-Haenszel adjusted OR/RR
 - [x] E-value calculator (unmeasured confounding) — auto-computed from crude/adjusted OR in Data Analysis Tab 4
 - [x] SMR/SIR calculator (standardized ratios)
@@ -159,3 +153,9 @@
 - [x] Paper extraction → compare adjustment sets on DAG Builder page
 - [x] Name normalization functions (`normalize_variable_name`, `match_columns_to_dag_nodes`)
 - [x] 15 tests for matching functions
+
+## System Testing (Complete)
+- [x] 6 new test files: stats_calculator, power_calculator, dag_engine, confounder_detector, paper_parser, smoke
+- [x] 202 new tests (361 → 563 total across 19 files)
+- [x] All 5 previously untested core modules now have dedicated test coverage
+- [x] Integration smoke tests verify cross-module flows

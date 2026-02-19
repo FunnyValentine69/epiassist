@@ -157,8 +157,11 @@ When Ollama isn't running, the checkbox is automatically disabled.
 ## Development
 
 ```bash
-# Run tests
+# Run tests (563 tests across 19 files)
 pytest tests/
+
+# Run a single module's tests
+pytest tests/core/test_stats_calculator.py -v
 
 # Format code
 black .
