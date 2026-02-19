@@ -1,0 +1,251 @@
+age,sex,race,education,smoking,bmi,physical_activity,hypertension,survey_weight
+57,Female,White,High School,Never,26.4,Moderate,No,1.0321
+47,Male,Black,Some College,Never,30.1,Active,Yes,1.0143
+59,Female,Hispanic,Some College,Current,30.6,Moderate,Yes,0.8363
+72,Female,Asian,College+,Never,25.1,Active,No,1.3346
+46,Female,White,High School,Never,27.9,Sedentary,No,1.3257
+46,Female,Asian,High School,Never,38.7,Moderate,Yes,0.3737
+73,Male,White,College+,Never,36.6,Sedentary,Yes,1.7082
+61,Male,White,Some College,Current,30.2,Sedentary,Yes,0.3915
+42,Male,White,High School,Never,28.2,Moderate,No,1.4947
+58,Female,Other,Some College,Never,28.6,Active,No,1.5659
+43,Male,White,High School,Never,31.1,Sedentary,Yes,0.516
+43,Male,White,High School,Current,22.9,Moderate,No,0.7207
+53,Male,Black,Some College,Current,26.7,Active,Yes,0.516
+21,Male,White,Some College,Never,19.7,Sedentary,No,0.8007
+24,Female,White,College+,Never,30.0,Moderate,No,0.7652
+41,Female,White,High School,Never,31.2,Moderate,No,1.3168
+34,Male,White,Some College,Current,25.6,Moderate,Yes,1.7171
+54,Male,White,Some College,Never,35.9,Sedentary,No,1.7883
+36,Female,White,< High School,Current,21.9,Moderate,No,0.6673
+28,Male,Black,Some College,Never,20.7,Active,Yes,0.8007
+71,Male,White,High School,Never,29.1,Moderate,Yes,0.3826
+46,Male,White,College+,Never,33.2,Sedentary,Yes,0.5961
+51,Male,Hispanic,High School,Never,36.4,Active,Yes,1.4413
+28,Female,White,Some College,Never,25.7,Sedentary,No,1.993
+41,Female,Black,< High School,Never,33.4,Moderate,Yes,0.4804
+51,Male,White,College+,Never,27.8,Sedentary,No,0.6584
+32,Male,White,Some College,Never,27.1,Active,No,0.8808
+55,Female,White,Some College,Never,32.4,Moderate,Yes,1.0232
+40,Female,White,< High School,Never,31.3,Moderate,Yes,0.5961
+45,Female,White,College+,Current,20.1,Sedentary,Yes,1.1032
+40,Female,White,High School,Current,35.4,Moderate,Yes,0.7029
+77,Male,White,College+,Current,34.9,Active,Yes,0.8808
+49,Male,White,High School,Current,24.9,Active,No,1.1655
+34,Female,White,High School,Never,30.0,Moderate,No,0.8897
+62,Male,White,< High School,Never,30.5,Moderate,No,0.7118
+31,Female,White,Some College,Never,29.3,Moderate,Yes,0.8452
+53,Female,White,Some College,Never,25.2,Active,Yes,0.8541
+20,Female,Black,< High School,Never,24.6,Moderate,Yes,0.7385
+30,Male,White,College+,Never,27.9,Moderate,No,0.7829
+52,Female,Hispanic,Some College,Never,33.9,Moderate,No,1.9752
+61,Male,Black,Some College,Never,30.7,Moderate,Yes,1.1744
+52,Female,White,Some College,Never,26.1,Sedentary,No,0.7652
+48,Female,Hispanic,Some College,Never,31.9,Moderate,No,1.2634
+45,Male,Asian,Some College,Never,16.0,Moderate,Yes,0.7563
+27,Female,White,High School,Never,33.7,Active,Yes,1.6015
+39,Female,White,High School,Current,19.3,Sedentary,Yes,1.0677
+43,Male,Hispanic,College+,Never,26.2,Moderate,Yes,0.8452
+65,Male,Hispanic,College+,Never,22.4,Moderate,Yes,1.1121
+55,Male,White,High School,Current,21.5,Moderate,Yes,0.4093
+23,Male,White,High School,Current,33.8,Sedentary,No,0.5071
+54,Male,White,Some College,Current,25.7,Moderate,Yes,0.4893
+44,Female,White,Some College,Never,29.7,Moderate,No,0.952
+39,Male,Black,< High School,Never,27.8,Moderate,Yes,2.1175
+59,Male,White,High School,Never,30.4,Moderate,No,2.7136
+65,Female,White,College+,Never,28.4,Moderate,Yes,1.2278
+63,Male,Hispanic,Some College,Never,21.6,Active,No,1.1388
+37,Female,White,< High School,Never,33.0,Sedentary,No,0.3648
+45,Male,White,High School,Never,25.5,Active,Yes,0.6762
+54,Male,Black,High School,Never,20.2,Moderate,No,0.5961
+64,Female,Hispanic,Some College,Never,25.9,Sedentary,No,0.6495
+42,Female,White,< High School,Never,35.5,Sedentary,Yes,0.8185
+47,Female,White,< High School,Never,32.3,Moderate,Yes,0.7029
+33,Female,White,College+,Never,26.3,Active,No,0.3292
+32,Female,White,High School,Never,26.3,Moderate,No,1.2901
+62,Male,White,Some College,Current,26.4,Sedentary,Yes,0.516
+70,Male,White,High School,Never,38.4,Moderate,Yes,1.0054
+48,Female,White,< High School,Never,29.9,Moderate,Yes,2.509
+65,Female,White,High School,Never,30.2,Sedentary,Yes,0.5605
+55,Female,White,College+,Never,33.2,Moderate,No,0.2491
+40,Male,White,College+,Never,29.2,Moderate,No,0.774
+55,Male,White,College+,Never,26.7,Sedentary,No,1.5392
+73,Female,White,Some College,Never,27.0,Sedentary,Yes,2.3666
+49,Male,White,Some College,Never,27.6,Moderate,Yes,0.4804
+73,Female,Hispanic,High School,Current,27.8,Sedentary,Yes,1.1388
+18,Female,White,High School,Never,31.6,Active,No,0.7029
+62,Male,Black,College+,Never,28.3,Active,Yes,0.8452
+51,Female,Hispanic,< High School,Current,31.7,Sedentary,Yes,3.3364
+45,Female,White,< High School,Current,27.6,Moderate,Yes,0.4182
+51,Male,White,High School,Never,28.4,Moderate,No,1.0143
+20,Female,White,< High School,Never,18.0,Active,No,1.121
+46,Female,White,High School,Never,32.6,Sedentary,Yes,1.5303
+55,Female,Hispanic,Some College,Never,29.7,Moderate,Yes,0.9342
+72,Male,White,Some College,Never,33.0,Active,Yes,1.041
+42,Female,White,College+,Never,16.0,Moderate,No,0.7296
+37,Male,White,College+,Never,38.4,Moderate,Yes,1.0143
+42,Male,White,High School,Current,27.3,Moderate,No,0.7474
+63,Female,Black,High School,Current,33.5,Sedentary,Yes,1.21
+54,Male,White,High School,Never,22.8,Moderate,No,0.7385
+42,Male,White,Some College,Never,31.1,Moderate,No,1.0766
+57,Female,Other,High School,Never,22.7,Sedentary,Yes,0.8808
+51,Female,Black,Some College,Never,24.9,Sedentary,Yes,1.5659
+64,Female,White,Some College,Never,37.6,Active,Yes,0.863
+39,Female,White,Some College,Never,27.0,Sedentary,No,0.3648
+45,Male,White,Some College,Never,29.1,Moderate,Yes,1.6727
+44,Male,White,High School,Current,32.4,Sedentary,Yes,0.5694
+28,Male,White,College+,Never,30.5,Active,No,0.6406
+54,Female,White,College+,Never,28.8,Sedentary,Yes,0.6584
+53,Female,White,High School,Never,29.8,Moderate,No,1.7705
+50,Female,White,College+,Never,40.0,Active,No,0.3025
+46,Female,Hispanic,Some College,Current,27.7,Sedentary,Yes,4.2706
+28,Male,White,College+,Never,29.0,Sedentary,No,1.5125
+43,Female,White,College+,Never,33.3,Active,No,0.9965
+44,Male,White,Some College,Never,33.5,Moderate,Yes,0.863
+37,Female,Other,< High School,Never,33.9,Moderate,Yes,1.0232
+47,Male,White,High School,Never,31.2,Sedentary,Yes,1.1566
+56,Female,White,Some College,Never,22.3,Sedentary,No,1.2278
+78,Male,Asian,Some College,Never,36.2,Moderate,Yes,1.1744
+52,Male,Hispanic,High School,Never,22.3,Moderate,Yes,0.9342
+53,Male,Hispanic,High School,Current,29.5,Sedentary,Yes,0.8096
+48,Female,White,College+,Never,24.2,Moderate,Yes,0.8274
+21,Female,White,College+,Never,27.7,Active,Yes,0.8096
+49,Male,Black,Some College,Current,29.6,Sedentary,No,1.5659
+50,Male,Asian,High School,Never,29.6,Moderate,No,1.2011
+85,Female,White,High School,Current,30.1,Sedentary,Yes,0.2046
+47,Male,White,< High School,Never,36.1,Active,Yes,1.2367
+54,Female,White,College+,Never,30.3,Moderate,Yes,0.9787
+49,Female,Hispanic,< High School,Never,26.8,Active,Yes,0.8808
+32,Male,White,Some College,Never,32.8,Sedentary,No,0.7296
+67,Male,White,High School,Never,33.9,Sedentary,Yes,1.557
+61,Female,White,Some College,Never,21.9,Sedentary,Yes,1.4324
+61,Male,White,Some College,Never,31.0,Sedentary,Yes,0.605
+36,Male,White,College+,Never,31.5,Sedentary,Yes,1.0943
+71,Female,White,High School,Never,26.5,Active,Yes,0.5516
+28,Female,Black,< High School,Current,34.9,Sedentary,Yes,0.4449
+58,Female,White,High School,Current,27.2,Sedentary,No,0.6495
+82,Female,White,College+,Current,28.6,Active,Yes,1.3702
+35,Male,White,College+,Never,27.1,Moderate,Yes,1.4324
+41,Male,White,Some College,Never,28.1,Active,Yes,1.1477
+51,Female,White,Some College,Never,22.5,Sedentary,Yes,1.2812
+42,Female,White,Some College,Never,20.8,Moderate,No,1.1477
+26,Male,White,High School,Never,36.0,Sedentary,No,0.6495
+51,Female,White,College+,Never,23.8,Sedentary,No,1.1032
+34,Male,White,Some College,Never,23.0,Active,No,1.3257
+57,Female,Other,High School,Never,17.2,Sedentary,Yes,1.299
+36,Male,White,Some College,Never,24.8,Moderate,No,1.6104
+73,Male,Hispanic,< High School,Never,21.4,Moderate,Yes,1.2634
+38,Male,White,High School,Never,36.2,Moderate,No,1.0588
+45,Male,Black,College+,Current,33.0,Active,Yes,1.5214
+62,Male,Hispanic,< High School,Never,24.6,Sedentary,Yes,0.8808
+31,Female,White,Some College,Never,39.3,Moderate,Yes,0.5694
+53,Female,White,High School,Never,32.9,Active,Yes,0.8185
+69,Female,White,High School,Current,26.4,Moderate,Yes,0.6139
+25,Female,White,High School,Never,16.0,Active,Yes,0.6317
+52,Male,Asian,High School,Never,39.5,Sedentary,No,0.8274
+53,Male,Hispanic,College+,Never,21.1,Moderate,No,0.5961
+61,Female,Asian,High School,Never,19.8,Sedentary,Yes,0.7652
+31,Male,White,Some College,Never,33.1,Moderate,Yes,0.347
+30,Female,Hispanic,Some College,Never,40.2,Active,Yes,0.9876
+57,Male,Asian,Some College,Current,34.9,Sedentary,Yes,0.8897
+54,Female,White,College+,Never,30.8,Moderate,No,0.5872
+53,Male,White,College+,Never,31.0,Sedentary,Yes,1.2367
+55,Female,Hispanic,High School,Current,32.3,Moderate,No,1.4235
+39,Female,White,< High School,Never,31.8,Moderate,Yes,0.4004
+53,Female,Hispanic,High School,Never,29.4,Active,Yes,0.605
+54,Male,White,Some College,Never,28.5,Moderate,No,0.605
+39,Female,Hispanic,< High School,Never,27.7,Moderate,Yes,0.5605
+77,Female,White,Some College,Current,24.2,Sedentary,Yes,1.3435
+57,Female,White,Some College,Never,26.6,Sedentary,Yes,0.8096
+32,Female,White,High School,Current,19.5,Sedentary,No,0.7829
+59,Female,Hispanic,College+,Never,27.5,Sedentary,Yes,0.3292
+35,Male,Black,< High School,Never,23.1,Active,No,1.2189
+61,Female,White,< High School,Never,22.5,Moderate,No,0.4804
+67,Female,White,College+,Never,28.9,Moderate,Yes,0.9164
+37,Female,Hispanic,Some College,Never,35.0,Sedentary,No,1.0232
+64,Male,White,College+,Current,32.6,Sedentary,Yes,1.7527
+56,Male,Hispanic,Some College,Never,20.1,Moderate,Yes,0.4626
+62,Female,White,High School,Current,23.1,Sedentary,Yes,0.1957
+78,Female,White,College+,Never,32.7,Moderate,Yes,0.9787
+46,Male,White,College+,Current,23.1,Sedentary,Yes,2.1887
+38,Female,White,College+,Never,26.9,Sedentary,No,1.6549
+36,Male,Hispanic,High School,Never,30.8,Moderate,Yes,0.9876
+37,Male,White,Some College,Never,23.2,Moderate,Yes,0.694
+48,Male,White,High School,Never,28.5,Sedentary,Yes,1.3346
+55,Male,Hispanic,< High School,Never,21.3,Active,Yes,0.5427
+54,Female,White,College+,Never,25.0,Active,Yes,1.1299
+62,Male,White,High School,Never,29.6,Moderate,No,1.1477
+50,Female,Hispanic,College+,Current,20.0,Sedentary,No,1.5125
+71,Female,Black,Some College,Never,30.2,Moderate,Yes,3.5322
+46,Female,White,High School,Never,27.9,Moderate,Yes,1.0854
+85,Female,Asian,Some College,Never,30.8,Moderate,Yes,0.694
+59,Male,Black,College+,Never,29.1,Sedentary,Yes,0.8808
+37,Female,White,College+,Never,34.8,Moderate,No,0.3648
+33,Female,White,College+,Never,28.6,Active,No,0.6317
+57,Male,Hispanic,Some College,Never,25.9,Moderate,Yes,0.7207
+46,Female,Black,College+,Never,28.6,Sedentary,Yes,0.6851
+60,Female,White,College+,Never,30.7,Active,No,0.9609
+57,Female,Hispanic,High School,Never,28.2,Sedentary,Yes,0.5872
+48,Female,Hispanic,Some College,Never,28.2,Sedentary,No,1.557
+37,Female,White,High School,Never,24.5,Sedentary,Yes,0.8897
+27,Male,White,College+,Never,24.7,Moderate,No,0.8897
+43,Female,White,College+,Never,21.0,Active,No,0.7563
+62,Female,Hispanic,< High School,Never,36.7,Moderate,Yes,0.9609
+53,Male,White,College+,Never,21.8,Sedentary,No,1.3435
+31,Male,White,College+,Never,24.5,Active,Yes,0.5783
+52,Male,Hispanic,High School,Never,24.4,Active,No,0.6406
+55,Female,Hispanic,Some College,Never,32.5,Active,Yes,0.7652
+36,Female,White,College+,Never,26.5,Sedentary,No,0.4538
+52,Male,Hispanic,< High School,Never,34.2,Moderate,No,0.5872
+50,Female,White,College+,Never,24.6,Active,No,0.7029
+32,Male,Hispanic,High School,Current,29.4,Sedentary,Yes,1.3791
+55,Female,White,College+,Never,23.8,Sedentary,No,1.0143
+58,Female,White,College+,Never,38.7,Sedentary,Yes,0.9787
+66,Female,Hispanic,College+,Never,22.1,Moderate,Yes,1.3613
+65,Male,White,Some College,Never,29.5,Active,No,0.8274
+29,Male,White,College+,Never,31.2,Moderate,Yes,1.0854
+35,Male,Black,College+,Current,30.1,Moderate,No,0.8452
+57,Male,Black,High School,Never,27.1,Sedentary,Yes,1.0143
+57,Female,Black,College+,Never,27.4,Moderate,Yes,0.6673
+57,Female,Black,< High School,Never,28.2,Active,No,0.2669
+85,Female,White,Some College,Never,27.3,Moderate,Yes,0.8363
+58,Female,White,High School,Never,32.8,Active,Yes,1.815
+67,Female,White,High School,Never,39.1,Active,Yes,1.4146
+64,Female,White,< High School,Never,25.2,Sedentary,Yes,1.4413
+59,Female,Hispanic,College+,Never,21.2,Moderate,No,1.6549
+45,Female,White,High School,Never,27.6,Sedentary,No,0.9342
+61,Male,White,College+,Never,40.9,Active,Yes,0.9787
+38,Male,White,< High School,Never,24.0,Moderate,No,0.6495
+46,Male,Asian,High School,Never,36.2,Moderate,Yes,0.7563
+42,Female,White,Some College,Never,36.4,Active,No,1.21
+51,Female,White,College+,Never,25.2,Moderate,No,1.6282
+84,Male,White,High School,Never,30.8,Active,Yes,0.8274
+21,Female,Black,Some College,Never,36.1,Moderate,Yes,0.7118
+60,Female,White,College+,Never,26.1,Sedentary,No,0.8897
+25,Male,Hispanic,Some College,Never,27.0,Moderate,Yes,1.2011
+42,Male,Asian,High School,Never,25.1,Active,Yes,0.436
+66,Female,White,< High School,Never,22.9,Moderate,Yes,0.2847
+50,Female,Black,College+,Never,24.8,Active,No,0.6762
+33,Female,Asian,< High School,Never,21.9,Active,No,0.4804
+39,Female,Black,College+,Never,28.2,Sedentary,Yes,0.694
+60,Female,White,Some College,Current,24.2,Sedentary,Yes,0.8274
+39,Female,White,College+,Never,29.2,Sedentary,No,0.7118
+53,Female,Black,College+,Never,20.2,Sedentary,No,1.8417
+50,Female,White,College+,Never,29.7,Sedentary,Yes,1.0499
+40,Male,Hispanic,High School,Current,32.2,Active,Yes,1.0321
+82,Male,Asian,College+,Never,18.0,Moderate,No,1.21
+59,Male,Asian,Some College,Never,29.9,Sedentary,No,0.5071
+19,Female,White,Some College,Never,34.1,Moderate,No,1.4947
+52,Female,White,Some College,Never,22.0,Moderate,Yes,0.8541
+40,Female,Other,College+,Never,36.4,Sedentary,Yes,1.2456
+62,Male,Hispanic,College+,Current,30.1,Active,Yes,0.5249
+38,Male,White,College+,Never,24.5,Active,Yes,0.4093
+48,Male,Asian,Some College,Never,27.7,Moderate,Yes,1.3435
+57,Male,Hispanic,Some College,Never,30.8,Active,Yes,1.0766
+62,Female,White,College+,Never,28.4,Moderate,No,0.5694
+31,Male,White,High School,Never,30.7,Active,Yes,0.5783
+44,Male,White,< High School,Never,23.4,Moderate,Yes,1.5659
+42,Female,White,High School,Never,28.8,Moderate,No,0.4893
+40,Male,White,High School,Never,20.9,Sedentary,No,2.0196
+76,Female,Hispanic,High School,Never,27.4,Active,Yes,0.5694
+56,Female,White,High School,Never,23.5,Moderate,Yes,1.2278

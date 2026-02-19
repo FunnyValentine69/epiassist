@@ -1,6 +1,48 @@
 # EpiAssist TODO
 
+## Post-Deployment Issues (Live Testing)
+
+_28 issues found during live testing on Streamlit Cloud. Organized by fix phase._
+
+### Phase 1: Critical Bug Fixes
+- [x] **1A. PDF Export Unicode Crash** — Bundled DejaVu Sans TTF fonts, replaced all Helvetica references with DejaVu
+- [x] **1B. Paper Analyzer → Meta-Analysis Import Bridge** — Added CI enrichment logic + improved error messaging
+
+### Phase 2: Global UI Polish
+- [x] **2A. Replace `st.caption` with readable text** — Replaced across all pages with `st.markdown`
+- [x] **2B. Dark mode contrast + centralize UI patterns** — Created `utils/ui_helpers.py` with `styled_banner`, `robustness_badge`, `plot_download_button`
+- [x] **2C. Plot download buttons** — Added interactive HTML download to Plotly figures across pages
+
+### Phase 3: Page-Specific UX
+- [x] **3A. Stats Calculator: Direct Standardization** — Pre-filled demo data, fixed rate multiplier labels, added integer column config
+- [x] **3B. Paper Analyzer: Ollama checkbox + Context column clarity** — Hidden when unavailable, renamed column
+- [x] **3C. Meta-Analysis: Settings location** — Moved sidebar settings into main page content
+- [x] **3D. Meta-Analysis: Forest plot improvements** — Added weight legend, labeled null reference line
+- [x] **3E. Hypothesis Testing: Interactive Bias Checklist + PICO** — Converted to interactive checkboxes and text inputs with session state persistence
+- [x] **3F. DAG Builder: Image export** — Added SVG download button for DAG visualization
+
+### Phase 4: Data Analysis Overhaul
+- [x] **4A. Built-in demo dataset** — Synthetic NHANES-style dataset (250 rows, 9 columns) with pre-assigned roles
+- [x] **4B. Variable roles: Add explanations** — Added role descriptions above each selector
+- [ ] **4C. Descriptive statistics: Full summary** — Add variance, IQR, skewness, kurtosis, mode, missing %, CI for mean; box plots; grouped categorical stats
+- [x] **4D. Tab-level guidance** — Added brief explanation at top of each analysis tab
+
+### Phase 5: Export & Reports Overhaul
+- [x] **5A. Methods section: Inject computed results** — Cross-tab OR/RR/chi, regression coefficients + AIC, meta-analysis pooled estimates + I², E-value
+- [x] **5B. PDF report: Capture Data Analysis results** — Cross-tab and MH results now stored in session state
+
+### Phase 6: Paper Analyzer Rework (Future)
+- [ ] **6A. Cloud LLM solution** — Explore Gemini API free tier or on-instance small models
+- [ ] **6B. Improve regex extraction quality** — Audit against corpus of 10-20 real epi papers
+- [ ] **6C. Explore CV-based text detection** — Research feasibility of bbox/segm for table/figure extraction
+- [ ] **6D. Visual theme polish** — Improve color palette, card layouts, typography
+
+---
+
 ## Monetization Roadmap
+
+> **Note**: Monetization roadmap says "GitHub repo set to PRIVATE" but repo is currently public for Streamlit Cloud deployment. This decision is deferred until monetization is pursued.
+
 - [ ] GitHub repo set to PRIVATE
 - [ ] MIT license removed, proprietary copyright added
 - [ ] Create public demo repo (Polyform Noncommercial license, basic extraction only)

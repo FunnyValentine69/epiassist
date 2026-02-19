@@ -23,7 +23,7 @@ st.divider()
 # -----------------------------------------------------------------------
 
 st.header("Manuscript Methods Section")
-st.caption(
+st.markdown(
     "Template-based generation — produces standard epidemiological "
     "Methods language from your session.  Review and adapt before use."
 )

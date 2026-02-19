@@ -5,6 +5,7 @@ import subprocess
 import streamlit as st
 
 from utils.constants import ALPHA_DEFAULT
+from utils.ui_helpers import styled_banner
 
 st.set_page_config(page_title="Hypothesis Testing - EpiAssist", layout="wide")
 
@@ -246,22 +247,7 @@ with col2:
             )
 
         # Display decision prominently
-        st.markdown(
-            f"""
-        <div style="
-            background-color: {'#d4edda' if decision_color == 'green' else '#fff3cd'};
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            margin-bottom: 20px;
-        ">
-            <h2 style="color: {'#155724' if decision_color == 'green' else '#856404'}; margin: 0;">
-                {decision}
-            </h2>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
+        styled_banner(decision, "success" if decision_color == "green" else "warning")
 
         st.markdown("### Conclusion")
         st.markdown(conclusion)
@@ -283,39 +269,70 @@ with col2:
     st.markdown("### Study Design Considerations")
 
     with st.expander("Bias Checklist"):
-        st.markdown("""
-        **Selection Bias:**
-        - Are cases and controls selected from the same source population?
-        - Is there differential participation by exposure status?
-
-        **Information Bias:**
-        - Is outcome assessment blinded to exposure status?
-        - Is measurement error equal across groups?
-
-        **Confounding:**
-        - Have all known confounders been measured?
-        - Is unmeasured confounding plausible?
-
-        **Temporal Relationship:**
-        - Does exposure precede outcome in time?
-        - Could reverse causation explain the association?
-        """)
+        st.markdown("**Selection Bias:**")
+        st.checkbox(
+            "Cases and controls selected from the same source population",
+            key="bias_selection_1",
+        )
+        st.checkbox(
+            "No differential participation by exposure status",
+            key="bias_selection_2",
+        )
+        st.markdown("**Information Bias:**")
+        st.checkbox(
+            "Outcome assessment blinded to exposure status",
+            key="bias_information_1",
+        )
+        st.checkbox(
+            "Measurement error equal across groups",
+            key="bias_information_2",
+        )
+        st.markdown("**Confounding:**")
+        st.checkbox(
+            "All known confounders measured",
+            key="bias_confounding_1",
+        )
+        st.checkbox(
+            "Unmeasured confounding considered",
+            key="bias_confounding_2",
+        )
+        st.markdown("**Temporal Relationship:**")
+        st.checkbox(
+            "Exposure precedes outcome in time",
+            key="bias_temporal_1",
+        )
+        st.checkbox(
+            "Reverse causation ruled out",
+            key="bias_temporal_2",
+        )
 
     with st.expander("PICO Framework"):
-        st.markdown("""
-        Structure your research question using PICO:
-
-        - **P**opulation: Who is being studied?
-        - **I**ntervention/Exposure: What is the exposure of interest?
-        - **C**omparison: What is the reference group?
-        - **O**utcome: What outcome is being measured?
-
-        **Example (Hearing Loss Study):**
-        - P: Working-age adults
-        - I: Hearing loss
-        - C: No hearing loss
-        - O: Unemployment status
-        """)
+        st.markdown("Structure your research question using PICO:")
+        ai = st.session_state.get("hypo_ai_response", {})
+        # Initialize PICO fields from AI response if not already in session state
+        for field in ("pico_p", "pico_i", "pico_c", "pico_o"):
+            if field not in st.session_state:
+                st.session_state[field] = ai.get(field, "")
+        st.text_input(
+            "P (Population)",
+            key="pico_p",
+            placeholder="Who is being studied?",
+        )
+        st.text_input(
+            "I (Intervention/Exposure)",
+            key="pico_i",
+            placeholder="What is the exposure of interest?",
+        )
+        st.text_input(
+            "C (Comparison)",
+            key="pico_c",
+            placeholder="What is the reference group?",
+        )
+        st.text_input(
+            "O (Outcome)",
+            key="pico_o",
+            placeholder="What outcome is being measured?",
+        )
 
 st.divider()
 

@@ -1,5 +1,7 @@
 """Data Analysis page for uploading and analyzing epidemiological datasets."""
 
+from pathlib import Path
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -34,6 +36,9 @@ from core.stats_calculator import (
     calculate_risk_difference,
     calculate_risk_ratio,
 )
+from utils.ui_helpers import plot_download_button, robustness_badge
+
+_DEMO_CSV = Path(__file__).resolve().parent.parent / "data" / "demo_epi.csv"
 
 NUMERIC_STAT_KEYS = ["n", "Mean", "Median", "SD", "Q1", "Q3", "Min", "Max"]
 NUMERIC_STAT_FIELDS = ["n", "mean", "median", "sd", "q1", "q3", "min", "max"]
@@ -149,7 +154,45 @@ with tab1:
             hide_index=True,
         )
     else:
-        st.info("Upload or paste data to get started.")
+        st.info("Upload or paste data to get started, or load the built-in demo dataset.")
+        if st.button("Load Demo Dataset", key="data_load_demo_btn",
+                     help="Synthetic NHANES-style dataset (250 rows) with pre-assigned variable roles"):
+            if not _DEMO_CSV.exists():
+                st.error(
+                    "Demo dataset not found. Run "
+                    "`python scripts/generate_demo_data.py` to create it."
+                )
+            else:
+                try:
+                    demo_df = pd.read_csv(_DEMO_CSV)
+                    expected = {"hypertension", "smoking", "age", "sex", "race",
+                                "education", "bmi", "physical_activity", "survey_weight"}
+                    missing = expected - set(demo_df.columns)
+                    if missing:
+                        st.error(f"Demo dataset missing columns: {', '.join(sorted(missing))}")
+                    else:
+                        st.session_state.data_df = demo_df
+                        st.session_state.data_col_summary = summarize_columns(demo_df)
+                        st.session_state.data_source_name = "Demo Dataset (Synthetic NHANES)"
+                        # Pre-assign variable roles
+                        st.session_state.data_outcome_col = "hypertension"
+                        st.session_state.data_outcome_positive = "Yes"
+                        st.session_state.data_exposure_col = "smoking"
+                        st.session_state.data_exposure_positive = "Current"
+                        st.session_state.data_confounder_cols = ["age", "sex", "race", "education", "bmi"]
+                        st.session_state.data_mediator_cols = ["physical_activity"]
+                        st.session_state.data_weight_col = "survey_weight"
+                        # Set widget keys to sync with UI selectboxes
+                        st.session_state.data_outcome_col_select = "hypertension"
+                        st.session_state.data_outcome_positive_select = "Yes"
+                        st.session_state.data_exposure_col_select = "smoking"
+                        st.session_state.data_exposure_positive_select = "Current"
+                        st.session_state.data_confounder_cols_select = ["age", "sex", "race", "education", "bmi"]
+                        st.session_state.data_mediator_cols_select = ["physical_activity"]
+                        st.session_state.data_weight_col_select = "survey_weight"
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to load demo dataset: {e}")
 
 
 # --- Tab 2: Variable Roles ---
@@ -166,6 +209,10 @@ with tab2:
             st.markdown("### Assign Roles")
 
             # Outcome
+            st.markdown(
+                "**Outcome** — The health event or condition you're studying "
+                "(e.g., disease status, mortality)."
+            )
             outcome_col = st.selectbox(
                 "Outcome variable",
                 ["(none)"] + all_columns,
@@ -185,6 +232,9 @@ with tab2:
                 st.session_state.pop("data_outcome_positive", None)
 
             # Exposure
+            st.markdown(
+                "**Exposure** — The risk factor or treatment you're investigating."
+            )
             exposure_col = st.selectbox(
                 "Exposure variable",
                 ["(none)"] + all_columns,
@@ -231,13 +281,17 @@ with tab2:
                             st.info(f"DAG suggests adjusting for: {matched_display}")
                             unmatched = [n for n in adj_set if n not in matched]
                             if unmatched:
-                                st.caption(f"Not found in data: {', '.join(unmatched)}")
+                                st.markdown(f"Not found in data: {', '.join(unmatched)}")
                             if st.button("Apply DAG suggestions", key="data_dag_apply_btn"):
                                 st.session_state.data_confounder_cols_select = list(matched.values())
                                 st.rerun()
                 except Exception as e:
                     st.warning(f"Could not load DAG suggestions: {e}")
 
+            st.markdown(
+                "**Confounders** — Variables that could distort the "
+                "exposure-outcome relationship."
+            )
             confounder_cols = st.multiselect(
                 "Confounder variables (optional)",
                 remaining,
@@ -264,6 +318,10 @@ with tab2:
                 except Exception:
                     pass
 
+            st.markdown(
+                "**Mediators** — Variables on the causal pathway between "
+                "exposure and outcome."
+            )
             mediator_cols = st.multiselect(
                 "Mediator variables (optional — for mediation analysis)",
                 mediator_remaining,
@@ -279,6 +337,10 @@ with tab2:
                            and c != st.session_state.get("data_exposure_col")
                            and c not in confounder_cols
                            and c not in mediator_cols]
+            st.markdown(
+                "**Weights** — Survey sampling weights to account for "
+                "complex survey design."
+            )
             weight_col = st.selectbox(
                 "Weight column (optional — survey weights)",
                 ["(none)"] + numeric_cols,
@@ -372,7 +434,7 @@ with tab3:
                                 if "mean" in stats:
                                     st.dataframe(_numeric_stats_df(stats), hide_index=True)
                                     if "effective_n" in stats and stats["effective_n"] is not None:
-                                        st.caption(f"Eff. N = {stats['effective_n']}")
+                                        st.markdown(f"Eff. N = {stats['effective_n']}")
 
                         # Histogram overlaid by exposure group
                         fig = go.Figure()
@@ -398,7 +460,7 @@ with tab3:
                             stats = descriptive_stats_numeric(series)
                         st.dataframe(_numeric_stats_df(stats), hide_index=True)
                         if "effective_n" in stats and stats["effective_n"] is not None:
-                            st.caption(f"Eff. N = {stats['effective_n']}")
+                            st.markdown(f"Eff. N = {stats['effective_n']}")
 
                         # Simple histogram
                         fig = go.Figure(go.Histogram(x=series.dropna()))
@@ -421,11 +483,15 @@ with tab3:
                         freq_df["Proportion"] = freq_df["Proportion"].apply(lambda x: f"{x:.1%}")
                         st.dataframe(freq_df, hide_index=True, use_container_width=True)
                     if stats["n_missing"] > 0:
-                        st.caption(f"Missing: {stats['n_missing']}")
+                        st.markdown(f"Missing: {stats['n_missing']}")
 
 
 # --- Tab 4: Cross-Tabulation ---
 with tab4:
+    st.markdown(
+        "Build a 2x2 contingency table, compute effect estimates (OR, RR, RD) "
+        "with confidence intervals, and perform stratified Mantel-Haenszel analysis."
+    )
     if "data_df" not in st.session_state:
         st.info("Upload data in the first tab to perform cross-tabulation.")
     elif "data_outcome_col" not in st.session_state or "data_exposure_col" not in st.session_state:
@@ -470,6 +536,14 @@ with tab4:
         except Exception as e:
             st.error(f"Error calculating statistics: {e}")
             st.stop()
+
+        # Store results for PDF report generation
+        st.session_state.data_crosstab_results = {
+            "or": or_result,
+            "rr": rr_result,
+            "rd": rd_result,
+            "chi": chi_result,
+        }
 
         # Metrics
         col_or, col_rr = st.columns(2)
@@ -554,6 +628,7 @@ with tab4:
         )
 
         st.plotly_chart(fig, use_container_width=True)
+        plot_download_button(fig, filename="effect_estimates")
 
         # Interpretations
         st.markdown("### Interpretations")
@@ -639,6 +714,7 @@ with tab4:
                         st.stop()
 
                     mh_result = mh
+                    st.session_state.data_mh_result = mh
 
                     # Adjusted metrics
                     st.markdown("#### Adjusted Effect Estimates")
@@ -712,7 +788,7 @@ with tab4:
             if crude_e is not None and crude_e["e_value"] is not None:
                 st.divider()
                 st.markdown("### E-Value: Sensitivity to Unmeasured Confounding")
-                st.caption(
+                st.markdown(
                     "How strong would unmeasured confounding need to be "
                     "to explain away this association?"
                 )
@@ -757,25 +833,7 @@ with tab4:
                             )
 
                 # Robustness badge
-                e_val = crude_e["e_value"]
-                if e_val >= 5:
-                    robustness_color = "#d4edda"
-                    robustness_text = "Quite Robust"
-                elif e_val >= 3:
-                    robustness_color = "#fff3cd"
-                    robustness_text = "Moderately Robust"
-                else:
-                    robustness_color = "#f8d7da"
-                    robustness_text = "Vulnerable"
-
-                st.markdown(
-                    f'<div style="background-color: {robustness_color}; '
-                    f'padding: 15px; border-radius: 8px; text-align: center; '
-                    f'margin-top: 10px;">'
-                    f"<strong>Robustness to Unmeasured Confounding: "
-                    f"{robustness_text}</strong></div>",
-                    unsafe_allow_html=True,
-                )
+                robustness_badge(crude_e["e_value"])
 
                 with st.expander("E-Value Interpretation"):
                     st.markdown(crude_e["interpretation"])
@@ -789,6 +847,10 @@ with tab4:
 
 # --- Tab 5: Regression Analysis ---
 with tab5:
+    st.markdown(
+        "Fit logistic, linear, or Poisson regression models to estimate the "
+        "exposure effect while adjusting for confounders."
+    )
     if "data_df" not in st.session_state:
         st.info("Upload data in the first tab to run regression analysis.")
     elif "data_outcome_col" not in st.session_state or "data_exposure_col" not in st.session_state:
@@ -906,7 +968,7 @@ with tab5:
                 st.metric("N", f"{reg_result['n_observations']:,}")
 
             if reg_result["n_dropped"] > 0:
-                st.caption(f"{reg_result['n_dropped']} rows dropped due to missing values.")
+                st.markdown(f"{reg_result['n_dropped']} rows dropped due to missing values.")
 
             if not reg_result["converged"]:
                 st.warning("The model did not converge. Results may be unreliable.")
@@ -917,6 +979,10 @@ with tab5:
 
 # --- Tab 6: Propensity Score Analysis ---
 with tab6:
+    st.markdown(
+        "Use inverse probability of treatment weighting (IPTW) to estimate "
+        "causal effects while adjusting for measured confounders."
+    )
     if "data_df" not in st.session_state:
         st.info("Upload data in the first tab to begin propensity score analysis.")
     elif "data_outcome_col" not in st.session_state or "data_exposure_col" not in st.session_state:
@@ -1046,6 +1112,7 @@ with tab6:
                 yaxis_title="Count", height=350, margin=dict(t=30),
             )
             st.plotly_chart(fig_ps, use_container_width=True)
+            plot_download_button(fig_ps, filename="ps_distribution")
 
             # 3. Common Support
             cs = ps_result["common_support"]
@@ -1082,6 +1149,7 @@ with tab6:
                 margin=dict(t=30),
             )
             st.plotly_chart(fig_love, use_container_width=True)
+            plot_download_button(fig_love, filename="love_plot")
 
             # 5. Balance Table
             bal_df = pd.DataFrame(bal_data)
@@ -1229,15 +1297,15 @@ with tab7:
             with e_col1:
                 st.metric("Total Effect (c)", f"{effects['total']:.4f}")
                 lo, hi = ci["total_ci"]
-                st.caption(f"95% CI: {lo:.4f} to {hi:.4f}")
+                st.markdown(f"95% CI: {lo:.4f} to {hi:.4f}")
             with e_col2:
                 st.metric("Direct Effect (c')", f"{effects['direct']:.4f}")
                 lo, hi = ci["direct_ci"]
-                st.caption(f"95% CI: {lo:.4f} to {hi:.4f}")
+                st.markdown(f"95% CI: {lo:.4f} to {hi:.4f}")
             with e_col3:
                 st.metric("Indirect Effect", f"{effects['indirect']:.4f}")
                 lo, hi = ci["indirect_ci"]
-                st.caption(f"95% CI: {lo:.4f} to {hi:.4f}")
+                st.markdown(f"95% CI: {lo:.4f} to {hi:.4f}")
 
             # Sobel test and proportion mediated
             st.markdown("#### Significance & Proportion Mediated")
@@ -1292,7 +1360,7 @@ with tab7:
             st.dataframe(path_df, use_container_width=True, hide_index=True)
 
             # Method and sample info
-            st.caption(
+            st.markdown(
                 f"Method: {effects['method']} | "
                 f"N = {med_r['n_observations']:,} | "
                 f"Dropped: {med_r['n_dropped']:,} | "

@@ -127,6 +127,15 @@ with col2:
         dot = engine.render_graphviz()
         st.graphviz_chart(dot.source)
 
+        # DAG image export
+        svg_bytes = dot.pipe(format="svg")
+        st.download_button(
+            "Download DAG (SVG)",
+            data=svg_bytes,
+            file_name="dag.svg",
+            mime="image/svg+xml",
+        )
+
         # Legend
         st.markdown("""
         **Legend:**

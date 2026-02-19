@@ -96,8 +96,8 @@
 - Pooled estimate display with heterogeneity statistics
 
 #### 7_Data_Analysis.py
-- Data upload (CSV, Excel) and paste interface
-- Variable role assignment (outcome, exposure, confounders)
+- Data upload (CSV, Excel) and paste interface, plus built-in demo dataset (synthetic NHANES)
+- Variable role assignment with explanations (outcome, exposure, confounders, mediators, weights)
 - Descriptive statistics with grouped comparisons and histograms
 - Auto-generated 2x2 cross-tabulation using `build_contingency_table`
 - Reuses `stats_calculator` for OR, RR, RD, Chi-square on derived table
@@ -281,8 +281,10 @@ def interpret_e_value(e_value: float) -> str
 
 #### report_generator.py
 ```python
+class EpiAssistReport(FPDF):
+    # Registers DejaVu Sans fonts (regular, bold, oblique) for Unicode support
 def generate_report(session_state: dict) -> bytes
-    # PDF report via fpdf2 (text + tables, no figures)
+    # PDF report via fpdf2 with DejaVu Sans fonts (text + tables, no figures)
     # Sections: title page, data summary, DAG, effect estimates,
     #           regression, propensity score, mediation, meta-analysis,
     #           paper summary, methods section
@@ -310,12 +312,23 @@ def interpret_propensity_score(estimand, effect_value, ci_lower, ci_upper, outco
 def interpret_mediation(mediator_name, exposure_name, outcome_name, indirect, direct, total, indirect_ci, direct_ci, sobel_p, proportion_mediated, method, n_obs, confounder_names, weighted=False) -> str
 ```
 
+#### ui_helpers.py
+```python
+def styled_banner(text: str, level: str = "success") -> None
+    # Dark-mode-compatible colored banner (success/warning/error/info)
+def robustness_badge(e_value: float) -> None
+    # E-value robustness display using styled_banner
+def plot_download_button(fig: object, filename: str = "plot", label: str = "Download Plot (HTML)") -> None
+    # Plotly figure download as interactive HTML (no kaleido needed)
+```
+
 #### methods_generator.py
 ```python
 def generate_methods_section(state: dict) -> str
     # Template-based Methods section from session state
     # Sections: study design, descriptive, cross-tab, regression,
     #           propensity score, mediation, meta-analysis, sensitivity, software
+    # Injects computed results (OR/RR, regression coefficients, pooled estimates, E-values)
 ```
 
 #### constants.py
@@ -580,12 +593,23 @@ st.session_state = {
     "data_mediator_cols": list[str],       # Selected mediator columns
     "data_med_result": dict | None,        # Full mediation analysis result
 
+    # Cross-Tabulation Results (stored for PDF report)
+    "data_crosstab_results": dict | None,  # {or, rr, rd, chi} from cross-tab tab
+    "data_mh_result": dict | None,         # Mantel-Haenszel adjusted results
+
     # Export & Report (Page 8)
     "export_methods_text": str,            # Generated manuscript Methods section
 }
 ```
 
 ## Scripts
+
+### scripts/generate_demo_data.py
+
+Generates a synthetic NHANES-style epidemiological dataset (250 rows, 9 columns:
+age, sex, race, education, smoking, bmi, physical_activity, hypertension, survey_weight).
+Output: `data/demo_epi.csv`. Uses logistic probability model for realistic exposure-outcome
+relationships. All data is synthetic — no real NHANES records.
 
 ### scripts/diagnose_extraction.py
 
@@ -626,7 +650,7 @@ python scripts/diagnose_extraction.py ./my_papers  # Custom folder
 
 ## Testing
 
-563 tests across 19 files. No Streamlit or network dependencies in any test.
+577 tests across 20 files. No Streamlit or network dependencies in any test.
 
 ### Coverage Map
 
@@ -650,6 +674,7 @@ python scripts/diagnose_extraction.py ./my_papers  # Custom folder
 | `test_report_generator.py` | `report_generator.py` | 28 | Methods section + PDF generation |
 | `test_llm_extractor.py` | `llm_extractor.py` | 27 | LLM extraction (mocked Ollama) |
 | `test_methods_generator.py` | `methods_generator.py` | 39 | Methods text generation |
+| `tests/utils/test_ui_helpers.py` | `utils/ui_helpers.py` | 14 | Styled banners, robustness badge, plot download |
 | `test_smoke.py` | *(integration)* | 10 | Module imports + cross-module flows |
 
 ## Error Handling Strategy

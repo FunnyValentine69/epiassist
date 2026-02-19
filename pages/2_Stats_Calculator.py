@@ -13,6 +13,7 @@ from core.stats_calculator import (
 from core.smr_calculator import calculate_smr, calculate_smr_stratified
 from core.direct_standardization import calculate_direct_standardized_rate
 from utils.constants import DEMO_2X2_TABLE, STANDARD_POPULATIONS, RATE_MULTIPLIERS
+from utils.ui_helpers import plot_download_button
 
 st.set_page_config(page_title="Statistics Calculator - EpiAssist", layout="wide")
 
@@ -221,6 +222,7 @@ with tab_2x2:
             )
 
             st.plotly_chart(fig, width="stretch")
+            plot_download_button(fig, filename="effect_estimates")
 
             # Interpretations
             st.markdown("### Interpretations")
@@ -403,9 +405,13 @@ with tab_direct:
         multiplier_label = st.selectbox(
             "Rate multiplier",
             list(RATE_MULTIPLIERS.keys()),
-            index=2,  # default "per 100,000"
+            index=2,  # default "100,000"
             key="direct_multiplier",
         )
+
+    # Demo data matching the US 2000 standard population strata
+    _DEMO_EVENTS = [50, 30, 40, 60, 90, 150, 250, 400, 500, 300]
+    _DEMO_POP = [25000, 45000, 50000, 55000, 48000, 42000, 35000, 25000, 15000, 5000]
 
     # Build default DataFrame from selected standard population
     if "direct_strata_df" not in st.session_state or st.session_state.get("_direct_last_pop") != std_pop_name:
@@ -413,8 +419,8 @@ with tab_direct:
             pop = STANDARD_POPULATIONS[std_pop_name]
             st.session_state.direct_strata_df = pd.DataFrame({
                 "Stratum": [s["stratum_name"] for s in pop],
-                "Events": [0] * len(pop),
-                "Population": [0] * len(pop),
+                "Events": _DEMO_EVENTS[:len(pop)],
+                "Population": _DEMO_POP[:len(pop)],
                 "Standard Weight": [s["weight"] for s in pop],
             })
         else:
@@ -431,6 +437,10 @@ with tab_direct:
         st.session_state.direct_strata_df,
         num_rows="dynamic",
         key="direct_editor",
+        column_config={
+            "Events": st.column_config.NumberColumn("Events", min_value=0, step=1, format="%d"),
+            "Population": st.column_config.NumberColumn("Population", min_value=0, step=1, format="%d"),
+        },
     )
 
     direct_calc_btn = st.button("Calculate Adjusted Rate", type="primary")
