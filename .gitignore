@@ -31,8 +31,8 @@ ENV/
 env/
 .env
 
-# Streamlit
-.streamlit/
+# Streamlit secrets (config.toml is committed for Cloud deployment)
+.streamlit/secrets.toml
 
 # IDE
 .idea/
