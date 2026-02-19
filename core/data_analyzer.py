@@ -5,10 +5,21 @@ epidemiological datasets from CSV, Excel, or pasted text.
 """
 
 import io
+import math
 
 import numpy as np
 import pandas as pd
+from scipy import stats as scipy_stats
 from statsmodels.stats.weightstats import DescrStatsW
+
+
+def _sanitize(val: float | None) -> float | None:
+    """Replace NaN/inf with None to prevent silent garbage in output."""
+    if val is None:
+        return None
+    if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+        return None
+    return val
 
 
 def load_data(source: bytes | str, format: str) -> pd.DataFrame:
@@ -85,29 +96,67 @@ def descriptive_stats_numeric(series: pd.Series) -> dict:
         series: A pandas Series of numeric values.
 
     Returns:
-        Dict with n, mean, median, sd, q1, q3, iqr, min, max.
+        Dict with n, n_missing, missing_pct, mean, median, mode, sd, variance,
+        q1, q3, iqr, min, max, skewness, kurtosis, ci_lower, ci_upper.
     """
+    n_total = len(series)
+    n_missing = int(series.isna().sum())
     clean = series.dropna()
+    clean = clean[np.isfinite(clean)]
     n = len(clean)
+    missing_pct = round(n_missing / n_total * 100, 1) if n_total > 0 else 0.0
+
     if n == 0:
         return {
-            "n": 0, "mean": None, "median": None, "sd": None,
+            "n": 0, "n_missing": n_missing, "missing_pct": missing_pct,
+            "mean": None, "median": None, "mode": None,
+            "sd": None, "variance": None,
             "q1": None, "q3": None, "iqr": None, "min": None, "max": None,
+            "skewness": None, "kurtosis": None,
+            "ci_lower": None, "ci_upper": None,
         }
 
     q1 = float(clean.quantile(0.25))
     q3 = float(clean.quantile(0.75))
+    mean_val = float(clean.mean())
+    sd_val = float(clean.std()) if n > 1 else 0.0
+
+    # Mode: most frequent value (first if tied)
+    mode_result = clean.mode()
+    mode_val = float(mode_result.iloc[0]) if len(mode_result) > 0 else None
+
+    # 95% CI for the mean (t-distribution)
+    if n > 1 and sd_val > 0:
+        se = sd_val / np.sqrt(n)
+        t_crit = scipy_stats.t.ppf(0.975, df=n - 1)
+        ci_lower = round(mean_val - t_crit * se, 4)
+        ci_upper = round(mean_val + t_crit * se, 4)
+    elif n > 1:
+        # Zero variance: CI collapses to the mean
+        ci_lower = round(mean_val, 4)
+        ci_upper = round(mean_val, 4)
+    else:
+        ci_lower = None
+        ci_upper = None
 
     return {
         "n": n,
-        "mean": round(float(clean.mean()), 4),
-        "median": round(float(clean.median()), 4),
-        "sd": round(float(clean.std()), 4) if n > 1 else 0.0,
-        "q1": round(q1, 4),
-        "q3": round(q3, 4),
-        "iqr": round(q3 - q1, 4),
-        "min": round(float(clean.min()), 4),
-        "max": round(float(clean.max()), 4),
+        "n_missing": n_missing,
+        "missing_pct": missing_pct,
+        "mean": _sanitize(round(mean_val, 4)),
+        "median": _sanitize(round(float(clean.median()), 4)),
+        "mode": _sanitize(round(mode_val, 4)) if mode_val is not None else None,
+        "sd": _sanitize(round(sd_val, 4)),
+        "variance": _sanitize(round(sd_val**2, 4)),
+        "q1": _sanitize(round(q1, 4)),
+        "q3": _sanitize(round(q3, 4)),
+        "iqr": _sanitize(round(q3 - q1, 4)),
+        "min": _sanitize(round(float(clean.min()), 4)),
+        "max": _sanitize(round(float(clean.max()), 4)),
+        "skewness": _sanitize(round(float(clean.skew()), 4)) if n > 2 else None,
+        "kurtosis": _sanitize(round(float(clean.kurtosis()), 4)) if n > 3 else None,
+        "ci_lower": _sanitize(ci_lower),
+        "ci_upper": _sanitize(ci_upper),
     }
 
 
@@ -189,18 +238,27 @@ def weighted_stats_numeric(series: pd.Series, weights: pd.Series) -> dict:
         weights: A pandas Series of positive weights aligned with series.
 
     Returns:
-        Dict with n, mean, median, sd, q1, q3, iqr, min, max, effective_n.
+        Dict with n, n_missing, missing_pct, mean, median, mode, sd, variance,
+        q1, q3, iqr, min, max, skewness, kurtosis, ci_lower, ci_upper, effective_n.
     """
-    # Align and drop rows where either is NaN
-    mask = series.notna() & weights.notna()
+    n_total = len(series)
+    n_missing = int(series.isna().sum())
+    missing_pct = round(n_missing / n_total * 100, 1) if n_total > 0 else 0.0
+
+    # Align and drop rows where either is NaN or infinite
+    mask = series.notna() & weights.notna() & np.isfinite(series) & np.isfinite(weights)
     clean = series[mask]
     w = weights[mask]
     n = len(clean)
 
     if n == 0:
         return {
-            "n": 0, "mean": None, "median": None, "sd": None,
+            "n": 0, "n_missing": n_missing, "missing_pct": missing_pct,
+            "mean": None, "median": None, "mode": None,
+            "sd": None, "variance": None,
             "q1": None, "q3": None, "iqr": None, "min": None, "max": None,
+            "skewness": None, "kurtosis": None,
+            "ci_lower": None, "ci_upper": None,
             "effective_n": None,
         }
 
@@ -218,18 +276,46 @@ def weighted_stats_numeric(series: pd.Series, weights: pd.Series) -> dict:
 
     q1 = float(d.quantile(0.25).iloc[0])
     q3 = float(d.quantile(0.75).iloc[0])
+    mean_val = float(d.mean)
+    sd_val = float(d.std) if n > 1 else 0.0
+
+    # Mode: most frequent value (unweighted — mode is observation-level)
+    mode_result = clean.mode()
+    mode_val = float(mode_result.iloc[0]) if len(mode_result) > 0 else None
+
+    # 95% CI for the weighted mean using effective N
+    if n > 1 and sd_val > 0 and effective_n > 1:
+        se = sd_val / np.sqrt(effective_n)
+        t_crit = scipy_stats.t.ppf(0.975, df=max(1, int(effective_n) - 1))
+        ci_lower = round(mean_val - t_crit * se, 4)
+        ci_upper = round(mean_val + t_crit * se, 4)
+    elif n > 1:
+        # Zero variance: CI collapses to the mean
+        ci_lower = round(mean_val, 4)
+        ci_upper = round(mean_val, 4)
+    else:
+        ci_lower = None
+        ci_upper = None
 
     return {
         "n": n,
-        "mean": round(float(d.mean), 4),
-        "median": round(float(d.quantile(0.5).iloc[0]), 4),
-        "sd": round(float(d.std), 4) if n > 1 else 0.0,
-        "q1": round(q1, 4),
-        "q3": round(q3, 4),
-        "iqr": round(q3 - q1, 4),
+        "n_missing": n_missing,
+        "missing_pct": missing_pct,
+        "mean": _sanitize(round(mean_val, 4)),
+        "median": _sanitize(round(float(d.quantile(0.5).iloc[0]), 4)),
+        "mode": _sanitize(round(mode_val, 4)) if mode_val is not None else None,
+        "sd": _sanitize(round(sd_val, 4)),
+        "variance": _sanitize(round(sd_val**2, 4)),
+        "q1": _sanitize(round(q1, 4)),
+        "q3": _sanitize(round(q3, 4)),
+        "iqr": _sanitize(round(q3 - q1, 4)),
         # min/max are inherently unweighted (observation-level extremes)
-        "min": round(float(clean.min()), 4),
-        "max": round(float(clean.max()), 4),
+        "min": _sanitize(round(float(clean.min()), 4)),
+        "max": _sanitize(round(float(clean.max()), 4)),
+        "skewness": _sanitize(round(float(clean.skew()), 4)) if n > 2 else None,
+        "kurtosis": _sanitize(round(float(clean.kurtosis()), 4)) if n > 3 else None,
+        "ci_lower": _sanitize(ci_lower),
+        "ci_upper": _sanitize(ci_upper),
         "effective_n": effective_n,
     }
 
