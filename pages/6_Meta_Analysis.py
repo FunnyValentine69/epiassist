@@ -65,7 +65,7 @@ with tab1:
                     # Try matching a standalone CI from the same page
                     matched_ci = None
                     for ci in standalone_cis:
-                        if ci.get("page") == em.get("page") and ci.get("lower") is not None and ci.get("upper") is not None:
+                        if em.get("page") is not None and ci.get("page") == em.get("page") and ci.get("lower") is not None and ci.get("upper") is not None:
                             matched_ci = ci
                             break
                     if matched_ci:

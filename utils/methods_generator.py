@@ -303,7 +303,7 @@ def _section_meta_analysis(state: dict) -> str | None:
         model_results = meta.get(model_key)
         if model_results is None:
             continue
-        pooled = model_results.get("pooled_estimate")
+        pooled = model_results.get("value")
         ci_lo = model_results.get("ci_lower")
         ci_hi = model_results.get("ci_upper")
         if pooled is not None and ci_lo is not None and ci_hi is not None:
@@ -312,10 +312,12 @@ def _section_meta_analysis(state: dict) -> str | None:
                 f"The {label} pooled {measure} was {pooled:.2f} "
                 f"(95% CI: {ci_lo:.2f}\u2013{ci_hi:.2f})."
             )
-        i2 = model_results.get("i_squared")
-        if i2 is not None:
-            parts.append(f"Between-study heterogeneity was I\u00b2 = {i2:.1f}%.")
         break
+
+    het = meta.get("heterogeneity", {})
+    i2 = het.get("i_squared")
+    if i2 is not None:
+        parts.append(f"Between-study heterogeneity was I\u00b2 = {i2:.1f}%.")
 
     return "### Meta-Analysis\n\n" + " ".join(parts)
 

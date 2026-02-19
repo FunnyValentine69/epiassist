@@ -128,13 +128,16 @@ with col2:
         st.graphviz_chart(dot.source)
 
         # DAG image export
-        svg_bytes = dot.pipe(format="svg")
-        st.download_button(
-            "Download DAG (SVG)",
-            data=svg_bytes,
-            file_name="dag.svg",
-            mime="image/svg+xml",
-        )
+        try:
+            svg_bytes = dot.pipe(format="svg")
+            st.download_button(
+                "Download DAG (SVG)",
+                data=svg_bytes,
+                file_name="dag.svg",
+                mime="image/svg+xml",
+            )
+        except Exception:
+            st.markdown("SVG export unavailable (Graphviz not installed).")
 
         # Legend
         st.markdown("""
