@@ -13,6 +13,7 @@ from core.power_calculator import (
 from core.e_value import calculate_e_value_for_or
 from utils.constants import ALPHA_DEFAULT, POWER_DEFAULT
 from utils.interpretations import interpret_power
+from utils.ui_helpers import robustness_badge, plot_download_button
 
 st.set_page_config(page_title="Power Analysis - EpiAssist", layout="wide")
 
@@ -47,7 +48,7 @@ with tab1:
                 step=0.05,
                 help="Small=0.2, Medium=0.5, Large=0.8",
             )
-            st.caption(f"Effect size classification: **{classify_effect_size(effect_size)}**")
+            st.markdown(f"Effect size classification: **{classify_effect_size(effect_size)}**")
         else:
             st.markdown("#### Expected Odds Ratio")
             p0 = st.number_input(
@@ -173,6 +174,7 @@ with tab1:
                 )
 
                 st.plotly_chart(fig, width="stretch")
+                plot_download_button(fig, filename="power_curve")
         else:
             st.warning("Calculate sample size to see power curve.")
 
@@ -236,37 +238,14 @@ with tab2:
 
                 if result["e_value_ci"]:
                     st.metric("E-value (confidence interval)", f"{result['e_value_ci']:.2f}")
-                    st.caption("E-value for CI represents the minimum confounding strength to shift the CI to include 1.0")
+                    st.markdown("E-value for CI represents the minimum confounding strength to shift the CI to include 1.0")
 
                 st.markdown("#### Interpretation")
                 st.info(result["interpretation"])
 
                 # Visual indicator
                 e_val = result["e_value"]
-                if e_val >= 5:
-                    robustness_color = "#d4edda"
-                    robustness_text = "Quite Robust"
-                elif e_val >= 3:
-                    robustness_color = "#fff3cd"
-                    robustness_text = "Moderately Robust"
-                else:
-                    robustness_color = "#f8d7da"
-                    robustness_text = "Vulnerable"
-
-                st.markdown(
-                    f"""
-                    <div style="
-                        background-color: {robustness_color};
-                        padding: 15px;
-                        border-radius: 8px;
-                        text-align: center;
-                        margin-top: 10px;
-                    ">
-                        <strong>Robustness: {robustness_text}</strong>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                robustness_badge(e_val)
             else:
                 st.error(result["interpretation"])
         else:

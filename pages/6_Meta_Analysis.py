@@ -11,6 +11,7 @@ from utils.constants import (
     META_MEASURE_LABELS,
     Z_SCORE_95,
 )
+from utils.ui_helpers import plot_download_button
 
 st.set_page_config(page_title="Meta-Analysis - EpiAssist", layout="wide")
 
@@ -22,10 +23,9 @@ or DerSimonian-Laird random-effects models. Generate forest plots and funnel plo
 
 st.divider()
 
-# --- Sidebar Config ---
-with st.sidebar:
-    st.markdown("### Meta-Analysis Settings")
-
+# --- Settings ---
+col_measure, col_model = st.columns(2)
+with col_measure:
     measure_type = st.selectbox(
         "Effect measure",
         list(META_MEASURE_LABELS.keys()),
@@ -33,15 +33,15 @@ with st.sidebar:
         index=0,
         key="meta_measure_type_select",
     )
-
+with col_model:
     model = st.radio(
         "Model",
         ["Both", "Fixed-effect", "Random-effects"],
         horizontal=True,
         key="meta_model_select",
     )
-    model_map = {"Both": "both", "Fixed-effect": "fixed", "Random-effects": "random"}
-    model_key = model_map[model]
+model_map = {"Both": "both", "Fixed-effect": "fixed", "Random-effects": "random"}
+model_key = model_map[model]
 
 # --- Tabs ---
 tab1, tab2, tab3 = st.tabs(["Study Data", "Results", "Funnel Plot"])
@@ -52,8 +52,30 @@ with tab1:
     if "paper_results" in st.session_state:
         with st.expander("Import from Paper Analyzer"):
             paper_results = st.session_state.paper_results
+            all_ems = paper_results.get("effect_measures", [])
+            # Also check standalone CIs that could be matched
+            standalone_cis = paper_results.get("confidence_intervals", [])
+
+            # Try to enrich effect measures missing CIs with standalone CIs from the same page
+            enriched_ems = []
+            for em in all_ems:
+                if em.get("ci_lower") is not None and em.get("ci_upper") is not None:
+                    enriched_ems.append(em)
+                else:
+                    # Try matching a standalone CI from the same page
+                    matched_ci = None
+                    for ci in standalone_cis:
+                        if em.get("page") is not None and ci.get("page") == em.get("page") and ci.get("lower") is not None and ci.get("upper") is not None:
+                            matched_ci = ci
+                            break
+                    if matched_ci:
+                        enriched = {**em, "ci_lower": matched_ci["lower"], "ci_upper": matched_ci["upper"]}
+                        enriched_ems.append(enriched)
+                    else:
+                        enriched_ems.append(em)
+
             importable = [
-                em for em in paper_results.get("effect_measures", [])
+                em for em in enriched_ems
                 if em.get("ci_lower") is not None and em.get("ci_upper") is not None
             ]
 
@@ -91,8 +113,15 @@ with tab1:
                         st.success(msg)
                     else:
                         st.warning(f"No {import_type} studies with complete CIs found.")
+            elif all_ems:
+                n_total = len(all_ems)
+                n_no_ci = sum(1 for em in all_ems if em.get("ci_lower") is None or em.get("ci_upper") is None)
+                st.warning(
+                    f"Found {n_total} effect measure(s) but {n_no_ci} lack confidence intervals. "
+                    "You can manually enter CIs in the study data table below."
+                )
             else:
-                st.warning("No effect measures with complete CIs available for import.")
+                st.warning("No effect measures found in Paper Analyzer results.")
 
     # Default data
     if "meta_studies_df" not in st.session_state:
@@ -104,7 +133,7 @@ with tab1:
         })
 
     st.markdown("### Enter Study Data")
-    st.caption("Enter effect estimates and 95% confidence intervals for each study.")
+    st.markdown("Enter effect estimates and 95% confidence intervals for each study.")
 
     edited_df = st.data_editor(
         st.session_state.meta_studies_df,
@@ -185,10 +214,10 @@ with tab2:
                     f"Fixed-Effect {label}",
                     f"{result['fixed']['value']:.3f}",
                 )
-                st.caption(
+                st.markdown(
                     f"95% CI: {result['fixed']['ci_lower']:.3f} – {result['fixed']['ci_upper']:.3f}"
                 )
-                st.caption(f"z = {result['fixed']['z_value']:.3f}, p = {result['fixed']['p_value']:.4f}")
+                st.markdown(f"z = {result['fixed']['z_value']:.3f}, p = {result['fixed']['p_value']:.4f}")
 
         if result["random"]:
             idx = 1 if result["fixed"] else 0
@@ -197,22 +226,22 @@ with tab2:
                     f"Random-Effects {label}",
                     f"{result['random']['value']:.3f}",
                 )
-                st.caption(
+                st.markdown(
                     f"95% CI: {result['random']['ci_lower']:.3f} – {result['random']['ci_upper']:.3f}"
                 )
-                st.caption(f"z = {result['random']['z_value']:.3f}, p = {result['random']['p_value']:.4f}")
+                st.markdown(f"z = {result['random']['z_value']:.3f}, p = {result['random']['p_value']:.4f}")
                 pi = result["random"]["prediction_interval"]
                 pi_note = result["random"].get("prediction_interval_note")
-                st.caption(f"Prediction interval: {pi[0]:.3f} – {pi[1]:.3f}")
+                st.markdown(f"Prediction interval: {pi[0]:.3f} – {pi[1]:.3f}")
                 if pi_note:
-                    st.caption(f"Note: {pi_note}")
+                    st.markdown(f"Note: {pi_note}")
 
         het_idx = -1
         with cols[het_idx]:
             het = result["heterogeneity"]
             st.metric("I²", f"{het['i_squared']:.1f}%")
-            st.caption(f"Q = {het['q_statistic']:.2f}, p = {het['q_p_value']:.4f}")
-            st.caption(f"τ² = {het['tau_squared']:.4f}")
+            st.markdown(f"Q = {het['q_statistic']:.2f}, p = {het['q_p_value']:.4f}")
+            st.markdown(f"τ² = {het['tau_squared']:.4f}")
 
         # --- Interpretations ---
         st.markdown("### Interpretation")
@@ -288,7 +317,18 @@ with tab2:
             x=null_value,
             line_dash="dash",
             line_color="gray",
-            annotation_text=f"Null ({null_value})",
+            annotation_text=f"No effect ({null_value})",
+        )
+
+        # Weight legend annotation
+        fig.add_annotation(
+            text="Node size = study weight",
+            xref="paper",
+            yref="paper",
+            x=0.98,
+            y=0.02,
+            showarrow=False,
+            font=dict(size=10, color="gray"),
         )
 
         # Order y-axis: studies at top, pooled at bottom
@@ -309,6 +349,7 @@ with tab2:
             fig.update_xaxes(type="log")
 
         st.plotly_chart(fig, use_container_width=True)
+        plot_download_button(fig, filename="forest_plot")
 
         # --- Study Weights Table ---
         st.markdown("### Study Weights")
@@ -348,7 +389,7 @@ with tab3:
         primary = result["random"] if result["random"] else result["fixed"]
 
         st.markdown("### Funnel Plot")
-        st.caption("Asymmetry in the funnel plot may indicate publication bias.")
+        st.markdown("Asymmetry in the funnel plot may indicate publication bias.")
 
         # Get pooled estimate on analysis scale
         if is_ratio:
@@ -406,6 +447,7 @@ with tab3:
         )
 
         st.plotly_chart(fig, use_container_width=True)
+        plot_download_button(fig, filename="funnel_plot")
 
         st.markdown("#### Interpreting the Funnel Plot")
         st.markdown("""

@@ -98,14 +98,35 @@ def _section_cross_tabulation(state: dict) -> str | None:
     if not outcome or not exposure:
         return None
 
-    return (
-        "### Cross-Tabulation\n\n"
+    parts: list[str] = [
         f"A 2\u00d72 contingency table was constructed for {exposure} "
         f"and {outcome}. The odds ratio (OR), risk ratio (RR), and "
         f"risk difference (RD) were calculated with 95% confidence "
         f"intervals. Association was assessed using the Pearson "
-        f"chi-square test."
-    )
+        f"chi-square test.",
+    ]
+
+    ct = state.get("data_crosstab_results")
+    if ct:
+        or_r = ct.get("or", {})
+        if or_r.get("value") is not None and or_r.get("ci_lower") is not None:
+            parts.append(
+                f"The crude OR was {or_r['value']:.2f} "
+                f"(95% CI: {or_r['ci_lower']:.2f}\u2013{or_r['ci_upper']:.2f})."
+            )
+        rr_r = ct.get("rr", {})
+        if rr_r.get("value") is not None and rr_r.get("ci_lower") is not None:
+            parts.append(
+                f"The RR was {rr_r['value']:.2f} "
+                f"(95% CI: {rr_r['ci_lower']:.2f}\u2013{rr_r['ci_upper']:.2f})."
+            )
+        chi_r = ct.get("chi", {})
+        if chi_r.get("p_value") is not None:
+            p = chi_r["p_value"]
+            p_text = "< 0.001" if p < 0.001 else f"= {p:.3f}"
+            parts.append(f"The chi-square test p-value was {p_text}.")
+
+    return "### Cross-Tabulation\n\n" + " ".join(parts)
 
 
 def _section_regression(state: dict) -> str | None:
@@ -150,6 +171,22 @@ def _section_regression(state: dict) -> str | None:
             parts.append(f"The analytic sample included {int(n_obs):,} observations.")
         except (ValueError, TypeError):
             parts.append(f"The analytic sample included {n_obs} observations.")
+
+    exp_eff = reg.get("exposure_effect")
+    if exp_eff and exp_eff.get("effect") is not None:
+        ci_lo = exp_eff.get("ci_lower")
+        ci_hi = exp_eff.get("ci_upper")
+        if ci_lo is not None and ci_hi is not None:
+            parts.append(
+                f"The {effect_label} for {exposure} was "
+                f"{exp_eff['effect']:.3f} "
+                f"(95% CI: {ci_lo:.3f}\u2013{ci_hi:.3f})."
+            )
+
+    model_fit_data = reg.get("model_fit", {})
+    aic = model_fit_data.get("aic")
+    if aic is not None:
+        parts.append(f"Model fit was assessed using AIC ({aic:.1f}).")
 
     parts.append("All models were fit using generalized linear models (GLM).")
 
@@ -262,6 +299,26 @@ def _section_meta_analysis(state: dict) -> str | None:
         "Results are presented with 95% confidence intervals."
     )
 
+    for model_key in ("random", "fixed"):
+        model_results = meta.get(model_key)
+        if model_results is None:
+            continue
+        pooled = model_results.get("value")
+        ci_lo = model_results.get("ci_lower")
+        ci_hi = model_results.get("ci_upper")
+        if pooled is not None and ci_lo is not None and ci_hi is not None:
+            label = "random-effects" if model_key == "random" else "fixed-effect"
+            parts.append(
+                f"The {label} pooled {measure} was {pooled:.2f} "
+                f"(95% CI: {ci_lo:.2f}\u2013{ci_hi:.2f})."
+            )
+        break
+
+    het = meta.get("heterogeneity", {})
+    i2 = het.get("i_squared")
+    if i2 is not None:
+        parts.append(f"Between-study heterogeneity was I\u00b2 = {i2:.1f}%.")
+
     return "### Meta-Analysis\n\n" + " ".join(parts)
 
 
@@ -271,13 +328,23 @@ def _section_sensitivity(state: dict) -> str | None:
     if ev is None:
         return None
 
-    return (
-        "### Sensitivity Analysis\n\n"
+    parts: list[str] = [
         "The E-value was calculated to quantify the minimum strength "
         "of association that an unmeasured confounder would need to "
         "have with both the exposure and the outcome to fully explain "
-        "away the observed association (VanderWeele & Ding, 2017)."
-    )
+        "away the observed association (VanderWeele & Ding, 2017).",
+    ]
+
+    e_val = ev.get("e_value")
+    if e_val is not None:
+        parts.append(f"The E-value for the point estimate was {e_val:.2f}.")
+    e_val_ci = ev.get("e_value_ci")
+    if e_val_ci is not None:
+        parts.append(
+            f"The E-value for the confidence interval bound was {e_val_ci:.2f}."
+        )
+
+    return "### Sensitivity Analysis\n\n" + " ".join(parts)
 
 
 def _section_software(state: dict) -> str | None:  # noqa: ARG001

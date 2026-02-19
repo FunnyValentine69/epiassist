@@ -45,13 +45,14 @@ with col1:
         extract_btn = False
 
     llm_available = is_llm_available()
-    use_llm = st.checkbox(
-        "Enhance with AI (Ollama)",
-        value=False,
-        disabled=not llm_available,
-        help="Run a second-pass LLM extraction via local Ollama to catch stats that regex misses."
-        + ("" if llm_available else " (Ollama not detected — install and run 'ollama serve')"),
-    )
+    if llm_available:
+        use_llm = st.checkbox(
+            "Enhance with AI (Ollama)",
+            value=False,
+            help="Run a second-pass LLM extraction via local Ollama to catch stats that regex misses.",
+        )
+    else:
+        use_llm = False
 
     st.markdown("### What We Extract")
     st.markdown("""
@@ -196,7 +197,7 @@ with col2:
                             "Adjusted?": adjusted_str,
                             "Adjusted For": adj_for_str,
                             "Source": item.get("source", "regex"),
-                            "Context": item["context"][:60] + "...",
+                            "Source Snippet": item["context"][:60] + "...",
                         }
                     )
                 st.dataframe(pd.DataFrame(em_data), use_container_width=True)
@@ -220,7 +221,7 @@ with col2:
                             "CI Upper": item["ci_upper"] or "-",
                             "SE": item["se"] or "-",
                             "Source": item.get("source", "regex"),
-                            "Context": item["context"][:60] + "...",
+                            "Source Snippet": item["context"][:60] + "...",
                         }
                     )
                 st.dataframe(pd.DataFrame(beta_data), use_container_width=True)
@@ -239,7 +240,7 @@ with col2:
                             "Lower": item["lower"],
                             "Upper": item["upper"],
                             "Source": item.get("source", "regex"),
-                            "Context": item["context"][:60] + "...",
+                            "Source Snippet": item["context"][:60] + "...",
                         }
                     )
                 st.dataframe(pd.DataFrame(ci_data), use_container_width=True)
@@ -260,7 +261,7 @@ with col2:
                             "Operator": item["operator"],
                             "Significant (α=0.05)": "Yes" if item["value"] < 0.05 else "No",
                             "Source": item.get("source", "regex"),
-                            "Context": item["context"][:60] + "...",
+                            "Source Snippet": item["context"][:60] + "...",
                         }
                     )
                 st.dataframe(pd.DataFrame(p_data), use_container_width=True)
@@ -279,7 +280,7 @@ with col2:
                             "CI Lower": item["ci_lower"] or "-",
                             "CI Upper": item["ci_upper"] or "-",
                             "Source": item.get("source", "regex"),
-                            "Context": item["context"][:60] + "...",
+                            "Source Snippet": item["context"][:60] + "...",
                         }
                     )
                 st.dataframe(pd.DataFrame(md_data), use_container_width=True)
@@ -298,7 +299,7 @@ with col2:
                             "Mean": item["mean"] or "-",
                             "Value": item["value"],
                             "Source": item.get("source", "regex"),
-                            "Context": item["context"][:60] + "...",
+                            "Source Snippet": item["context"][:60] + "...",
                         }
                     )
                 st.dataframe(pd.DataFrame(sd_data), use_container_width=True)
@@ -317,7 +318,7 @@ with col2:
                             "Value": item["value"],
                             "Weight Method": item["weight_method"] or "-",
                             "Source": item.get("source", "regex"),
-                            "Context": item["context"][:60] + "...",
+                            "Source Snippet": item["context"][:60] + "...",
                         }
                     )
                 st.dataframe(pd.DataFrame(ws_data), use_container_width=True)

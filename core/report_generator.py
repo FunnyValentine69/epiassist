@@ -8,8 +8,13 @@ session-state key and skips silently if absent.
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 from fpdf import FPDF
+
+# Font directory relative to this module
+_FONT_DIR = Path(__file__).resolve().parent.parent / "fonts"
+_FONT_FAMILY = "DejaVu"
 
 
 # ---------------------------------------------------------------------------
@@ -17,13 +22,20 @@ from fpdf import FPDF
 # ---------------------------------------------------------------------------
 
 class EpiAssistReport(FPDF):
-    """PDF document with branded header/footer."""
+    """PDF document with branded header/footer and Unicode-safe fonts."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        # Register DejaVu Sans (supports Greek, math symbols, etc.)
+        self.add_font(_FONT_FAMILY, "", str(_FONT_DIR / "DejaVuSans.ttf"))
+        self.add_font(_FONT_FAMILY, "B", str(_FONT_DIR / "DejaVuSans-Bold.ttf"))
+        self.add_font(_FONT_FAMILY, "I", str(_FONT_DIR / "DejaVuSans-Oblique.ttf"))
 
     def header(self) -> None:
         """Add header on every page except the first (title page)."""
         if self.page_no() == 1:
             return
-        self.set_font("Helvetica", "B", 10)
+        self.set_font(_FONT_FAMILY, "B", 10)
         half = self.epw / 2
         self.cell(w=half, h=8, text="EpiAssist Analysis Report", align="L")
         self.cell(w=half, h=8, text=date.today().strftime("%Y-%m-%d"), align="R")
@@ -32,7 +44,7 @@ class EpiAssistReport(FPDF):
     def footer(self) -> None:
         """Page N / Total in the footer."""
         self.set_y(-15)
-        self.set_font("Helvetica", "I", 8)
+        self.set_font(_FONT_FAMILY, "I", 8)
         self.cell(w=0, h=10, text=f"Page {self.page_no()}/{{nb}}", align="C")
 
 
@@ -94,15 +106,15 @@ def _add_title_page(pdf: FPDF, state: dict) -> None:
     pdf.add_page()
 
     pdf.ln(40)
-    pdf.set_font("Helvetica", "B", 24)
+    pdf.set_font(_FONT_FAMILY, "B", 24)
     pdf.cell(w=0, h=15, text="EpiAssist Analysis Report", align="C")
     pdf.ln(20)
 
-    pdf.set_font("Helvetica", size=14)
+    pdf.set_font(_FONT_FAMILY, size=14)
     pdf.cell(w=0, h=10, text=date.today().strftime("%B %d, %Y"), align="C")
     pdf.ln(20)
 
-    pdf.set_font("Helvetica", size=12)
+    pdf.set_font(_FONT_FAMILY, size=12)
     source = state.get("data_source_name")
     if source:
         pdf.cell(w=0, h=10, text=f"Data Source: {source}", align="C")
@@ -121,11 +133,11 @@ def _add_data_summary(pdf: FPDF, state: dict) -> None:
 
     df = state["data_df"]
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_font(_FONT_FAMILY, "B", 16)
     pdf.cell(w=0, h=10, text="Data Summary")
     pdf.ln(12)
 
-    pdf.set_font("Helvetica", size=11)
+    pdf.set_font(_FONT_FAMILY, size=11)
     source = state.get("data_source_name", "Unknown")
     pdf.cell(w=0, h=8, text=f"Source: {source}")
     pdf.ln(6)
@@ -141,7 +153,7 @@ def _add_data_summary(pdf: FPDF, state: dict) -> None:
     weight_col = state.get("data_weight_col")
 
     if outcome or exposure:
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text="Variable Roles")
         pdf.ln(8)
         roles = []
@@ -159,7 +171,7 @@ def _add_data_summary(pdf: FPDF, state: dict) -> None:
     col_summary = state.get("data_col_summary")
     if col_summary:
         pdf.ln(10)
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text="Column Summary")
         pdf.ln(8)
         headers = ["Column", "Type", "Non-null", "Unique"]
@@ -186,11 +198,11 @@ def _add_dag_summary(pdf: FPDF, state: dict) -> None:
         return
 
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_font(_FONT_FAMILY, "B", 16)
     pdf.cell(w=0, h=10, text="DAG Summary")
     pdf.ln(12)
 
-    pdf.set_font("Helvetica", size=11)
+    pdf.set_font(_FONT_FAMILY, size=11)
     pdf.cell(w=0, h=8, text=f"Nodes: {len(nodes)}")
     pdf.ln(6)
     pdf.cell(w=0, h=8, text=f"Edges: {len(edges)}")
@@ -211,7 +223,7 @@ def _add_effect_estimates(pdf: FPDF, state: dict) -> None:
         return
 
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_font(_FONT_FAMILY, "B", 16)
     pdf.cell(w=0, h=10, text="Effect Estimates (2x2 Table)")
     pdf.ln(12)
 
@@ -248,13 +260,13 @@ def _add_regression(pdf: FPDF, state: dict) -> None:
         return
 
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_font(_FONT_FAMILY, "B", 16)
     model_type = reg.get("model_type", "Regression")
     pdf.cell(w=0, h=10, text=f"{model_type.capitalize()} Regression Results")
     pdf.ln(12)
 
     # Model info
-    pdf.set_font("Helvetica", size=11)
+    pdf.set_font(_FONT_FAMILY, size=11)
     pdf.cell(w=0, h=8, text=f"Model type: {model_type}")
     pdf.ln(6)
     pdf.cell(w=0, h=8, text=f"Observations: {_safe(reg.get('n_observations'))}")
@@ -267,7 +279,7 @@ def _add_regression(pdf: FPDF, state: dict) -> None:
     # Coefficient table
     coefficients = reg.get("coefficients", [])
     if coefficients:
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text="Coefficients")
         pdf.ln(8)
         headers = ["Variable", "Coef", "Effect", "95% CI", "p-value"]
@@ -286,7 +298,7 @@ def _add_regression(pdf: FPDF, state: dict) -> None:
     model_fit = reg.get("model_fit", {})
     if model_fit:
         pdf.ln(10)
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text="Model Fit")
         pdf.ln(8)
         fit_rows = []
@@ -307,10 +319,10 @@ def _add_regression(pdf: FPDF, state: dict) -> None:
     interp = reg.get("interpretation")
     if interp:
         pdf.ln(10)
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text="Interpretation")
         pdf.ln(8)
-        pdf.set_font("Helvetica", size=11)
+        pdf.set_font(_FONT_FAMILY, size=11)
         pdf.multi_cell(w=0, h=6, text=interp)
 
 
@@ -321,14 +333,14 @@ def _add_propensity_score(pdf: FPDF, state: dict) -> None:
         return
 
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_font(_FONT_FAMILY, "B", 16)
     pdf.cell(w=0, h=10, text="Propensity Score Analysis")
     pdf.ln(12)
 
     # Treatment effect
     te = ps.get("treatment_effect", {})
     if te is not None:
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text="Treatment Effect")
         pdf.ln(8)
         _render_table(
@@ -346,7 +358,7 @@ def _add_propensity_score(pdf: FPDF, state: dict) -> None:
     covariates = balance.get("covariates", [])
     if covariates:
         pdf.ln(10)
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text="Balance Diagnostics")
         pdf.ln(8)
         headers = ["Covariate", "SMD (raw)", "SMD (weighted)", "Balanced"]
@@ -365,7 +377,7 @@ def _add_propensity_score(pdf: FPDF, state: dict) -> None:
     ws = iptw.get("weight_summary", {})
     if ws:
         pdf.ln(10)
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text="Weight Summary")
         pdf.ln(8)
         ws_rows = []
@@ -386,10 +398,10 @@ def _add_propensity_score(pdf: FPDF, state: dict) -> None:
     interp = ps.get("interpretation")
     if interp:
         pdf.ln(10)
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text="Interpretation")
         pdf.ln(8)
-        pdf.set_font("Helvetica", size=11)
+        pdf.set_font(_FONT_FAMILY, size=11)
         pdf.multi_cell(w=0, h=6, text=interp)
 
 
@@ -400,14 +412,14 @@ def _add_mediation(pdf: FPDF, state: dict) -> None:
         return
 
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_font(_FONT_FAMILY, "B", 16)
     pdf.cell(w=0, h=10, text="Mediation Analysis")
     pdf.ln(12)
 
     # Effect decomposition
     effects = med.get("effects", {})
     if effects:
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text="Effect Decomposition")
         pdf.ln(8)
         ci = med.get("ci", {})
@@ -432,7 +444,7 @@ def _add_mediation(pdf: FPDF, state: dict) -> None:
     prop_med = effects.get("proportion_mediated")
     if prop_med is not None:
         pdf.ln(6)
-        pdf.set_font("Helvetica", size=11)
+        pdf.set_font(_FONT_FAMILY, size=11)
         pdf.cell(w=0, h=8, text=f"Proportion mediated: {prop_med:.1%}")
         pdf.ln(6)
 
@@ -440,7 +452,7 @@ def _add_mediation(pdf: FPDF, state: dict) -> None:
     models = med.get("models", {})
     if models:
         pdf.ln(6)
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text="Path Coefficients")
         pdf.ln(8)
         path_rows = []
@@ -462,10 +474,10 @@ def _add_mediation(pdf: FPDF, state: dict) -> None:
     interp = med.get("interpretation")
     if interp:
         pdf.ln(10)
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text="Interpretation")
         pdf.ln(8)
-        pdf.set_font("Helvetica", size=11)
+        pdf.set_font(_FONT_FAMILY, size=11)
         pdf.multi_cell(w=0, h=6, text=interp)
 
 
@@ -476,7 +488,7 @@ def _add_meta_analysis(pdf: FPDF, state: dict) -> None:
         return
 
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_font(_FONT_FAMILY, "B", 16)
     pdf.cell(w=0, h=10, text="Meta-Analysis Results")
     pdf.ln(12)
 
@@ -487,7 +499,7 @@ def _add_meta_analysis(pdf: FPDF, state: dict) -> None:
         result = meta.get(model_key)
         if result is None:
             continue
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text=f"{label} Model")
         pdf.ln(8)
         _render_table(
@@ -504,7 +516,7 @@ def _add_meta_analysis(pdf: FPDF, state: dict) -> None:
     # Heterogeneity
     het = meta.get("heterogeneity", {})
     if het is not None:
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text="Heterogeneity")
         pdf.ln(8)
         het_rows = []
@@ -524,7 +536,7 @@ def _add_meta_analysis(pdf: FPDF, state: dict) -> None:
     studies = meta.get("studies", [])
     if studies:
         pdf.ln(10)
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text="Individual Studies")
         pdf.ln(8)
         headers = ["Study", measure, "95% CI", "Weight (%)"]
@@ -547,12 +559,12 @@ def _add_paper_summary(pdf: FPDF, state: dict) -> None:
         return
 
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_font(_FONT_FAMILY, "B", 16)
     pdf.cell(w=0, h=10, text="Paper Analysis Summary")
     pdf.ln(12)
 
     # Counts
-    pdf.set_font("Helvetica", size=11)
+    pdf.set_font(_FONT_FAMILY, size=11)
     filename = state.get("paper_filename", "Unknown")
     pdf.cell(w=0, h=8, text=f"Paper: {filename}")
     pdf.ln(8)
@@ -571,7 +583,7 @@ def _add_paper_summary(pdf: FPDF, state: dict) -> None:
     ems = results.get("effect_measures", [])
     if ems:
         pdf.ln(8)
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(_FONT_FAMILY, "B", 12)
         pdf.cell(w=0, h=8, text="Extracted Effect Measures")
         pdf.ln(8)
         headers = ["Type", "Value", "95% CI", "Adjusted"]
@@ -593,11 +605,11 @@ def _add_methods_section(pdf: FPDF, state: dict) -> None:
         return
 
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_font(_FONT_FAMILY, "B", 16)
     pdf.cell(w=0, h=10, text="Generated Methods Section")
     pdf.ln(12)
 
-    pdf.set_font("Helvetica", size=11)
+    pdf.set_font(_FONT_FAMILY, size=11)
     # Strip markdown headers for plain-text rendering
     clean_text = methods.replace("## ", "").replace("### ", "")
     pdf.multi_cell(w=0, h=6, text=clean_text)

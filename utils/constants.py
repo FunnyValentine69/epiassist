@@ -122,7 +122,7 @@ SMD_BALANCE_THRESHOLD: float = 0.1
 
 # Rate multipliers for direct standardization output
 RATE_MULTIPLIERS: dict[str, int] = {
-    "per 1,000": 1_000,
-    "per 10,000": 10_000,
-    "per 100,000": 100_000,
+    "1,000": 1_000,
+    "10,000": 10_000,
+    "100,000": 100_000,
 }
