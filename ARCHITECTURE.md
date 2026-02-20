@@ -683,7 +683,7 @@ python scripts/diagnose_extraction.py ./my_papers  # Custom folder
 
 ## Testing
 
-623 tests across 21 files. No Streamlit or network dependencies in any test.
+642 tests across 21 files. No Streamlit or network dependencies in any test.
 
 ### Coverage Map
 
@@ -705,8 +705,8 @@ python scripts/diagnose_extraction.py ./my_papers  # Custom folder
 | `test_direct_standardization.py` | `direct_standardization.py` | 28 | Age-adjusted rates |
 | `test_smr_calculator.py` | `smr_calculator.py` | 22 | Standardized mortality ratios |
 | `test_report_generator.py` | `report_generator.py` | 28 | Methods section + PDF generation |
-| `test_llm_extractor.py` | `llm_extractor.py` | 18 | Provider-agnostic LLM extraction |
-| `test_llm_providers.py` | `llm_providers/` | 38 | Provider detection, parsing, Ollama/Gemini (mocked) |
+| `test_llm_extractor.py` | `llm_extractor.py` | 26 | Provider-agnostic LLM extraction |
+| `test_llm_providers.py` | `llm_providers/` | 49 | Provider detection, parsing, Ollama/Gemini (mocked) |
 | `test_methods_generator.py` | `methods_generator.py` | 39 | Methods text generation |
 | `tests/utils/test_ui_helpers.py` | `utils/ui_helpers.py` | 14 | Styled banners, robustness badge, plot download |
 | `test_smoke.py` | *(integration)* | 10 | Module imports + cross-module flows |

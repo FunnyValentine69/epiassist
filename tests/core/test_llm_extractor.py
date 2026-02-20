@@ -147,6 +147,14 @@ class TestMergeResults:
         merged = merge_results(regex, llm)
         assert all(len(v) == 0 for v in merged.values())
 
+    def test_none_key_item_preserved(self):
+        """Items where _dedup_key returns None should still be kept."""
+        empty = {cat: [] for cat in ["effect_measures", "confidence_intervals", "p_values", "sample_sizes", "beta_coefficients", "mean_differences", "standard_deviations", "weighted_statistics"]}
+        llm = {**empty, "effect_measures": [{"weird_field": "no_type_or_value", "page": 1}]}
+        merged = merge_results(empty, llm)
+        assert len(merged["effect_measures"]) == 1
+        assert merged["effect_measures"][0]["source"] == "llm"
+
 
 # --- _dedup_key ---
 
@@ -166,3 +174,33 @@ class TestDedupKey:
         item = {"type": "OR", "value": 2.5, "ci_lower": None, "ci_upper": None, "page": 1}
         key = _dedup_key(item, "effect_measures")
         assert key == ("OR", 2.5, None, None, 1)
+
+    def test_confidence_intervals_key(self):
+        item = {"level": 95, "lower": 1.2, "upper": 3.8, "page": 1}
+        key = _dedup_key(item, "confidence_intervals")
+        assert key == (95, 1.2, 3.8, 1)
+
+    def test_p_values_key(self):
+        item = {"value": 0.03, "operator": "=", "page": 2}
+        key = _dedup_key(item, "p_values")
+        assert key == (0.03, "=", 2)
+
+    def test_beta_coefficients_key(self):
+        item = {"value": 0.5, "ci_lower": 0.1, "ci_upper": 0.9, "page": 3}
+        key = _dedup_key(item, "beta_coefficients")
+        assert key == (0.5, 0.1, 0.9, 3)
+
+    def test_mean_differences_key(self):
+        item = {"value": 2.0, "ci_lower": 1.0, "ci_upper": 3.0, "page": 4}
+        key = _dedup_key(item, "mean_differences")
+        assert key == (2.0, 1.0, 3.0, 4)
+
+    def test_standard_deviations_key(self):
+        item = {"value": 1.5, "mean": 5.0, "type": "SD", "page": 5}
+        key = _dedup_key(item, "standard_deviations")
+        assert key == (1.5, 5.0, "SD", 5)
+
+    def test_weighted_statistics_key(self):
+        item = {"stat_type": "prevalence", "value": 25.3, "page": 6}
+        key = _dedup_key(item, "weighted_statistics")
+        assert key == ("prevalence", 25.3, 6)

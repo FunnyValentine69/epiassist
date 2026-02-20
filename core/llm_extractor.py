@@ -7,7 +7,10 @@ Results are deduplicated and merged with regex results.
 Delegates to providers in core.llm_providers (Gemini, Ollama).
 """
 
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from core.llm_providers import detect_provider, get_provider_functions
 from core.llm_providers._parse import (
@@ -46,7 +49,8 @@ def extract_with_llm(text: str, page: int = 1) -> dict[str, list[dict]]:
     try:
         funcs = get_provider_functions(provider)
         return funcs["extract_stats"](text, page)
-    except Exception:
+    except Exception as e:
+        logger.warning("LLM extraction failed for provider '%s': %s", provider, e)
         return _empty_results()
 
 

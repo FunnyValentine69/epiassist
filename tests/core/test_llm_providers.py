@@ -59,8 +59,9 @@ class TestSafeInt:
         assert _safe_int("abc") is None
 
     def test_bool_not_int(self):
-        # bool is subclass of int, but we treat it separately
-        assert _safe_int(True) is not None  # True -> 1 via float conversion
+        # bool is subclass of int — float conversion yields 1/0
+        assert _safe_int(True) == 1
+        assert _safe_int(False) == 0
 
 
 # --- parse_extraction_response ---
@@ -368,3 +369,136 @@ class TestEmptyResults:
         r2 = _empty_results()
         r1["p_values"].append({"value": 0.05})
         assert len(r2["p_values"]) == 0
+
+
+# --- get_provider_functions ---
+
+
+class TestGetProviderFunctions:
+    def test_gemini_returns_callables(self):
+        from core.llm_providers import get_provider_functions
+
+        funcs = get_provider_functions("gemini")
+        assert callable(funcs["extract_stats"])
+        assert callable(funcs["chat"])
+
+    def test_ollama_returns_callables(self):
+        from core.llm_providers import get_provider_functions
+
+        funcs = get_provider_functions("ollama")
+        assert callable(funcs["extract_stats"])
+        assert callable(funcs["chat"])
+
+    def test_unknown_raises_value_error(self):
+        from core.llm_providers import get_provider_functions
+
+        with pytest.raises(ValueError, match="Unknown provider"):
+            get_provider_functions("openai")
+
+
+# --- provider_display_name ---
+
+
+class TestProviderDisplayName:
+    def test_gemini(self):
+        from core.llm_providers import provider_display_name
+
+        assert provider_display_name("gemini") == "Gemini (cloud)"
+
+    def test_ollama(self):
+        from core.llm_providers import provider_display_name
+
+        assert provider_display_name("ollama") == "Ollama (local)"
+
+    def test_none(self):
+        from core.llm_providers import provider_display_name
+
+        assert provider_display_name(None) == "None"
+
+    def test_unknown(self):
+        from core.llm_providers import provider_display_name
+
+        assert provider_display_name("openai") == "None"
+
+
+# --- get_api_key ---
+
+
+class TestGetApiKey:
+    @patch("core.llm_providers.os.environ", {"GEMINI_API_KEY": "env-key"})
+    def test_from_secrets(self):
+        """st.secrets takes priority over env vars."""
+        mock_st = MagicMock()
+        mock_st.secrets.get.return_value = "my-key"
+        with patch.dict(sys.modules, {"streamlit": mock_st}):
+            from core.llm_providers import get_api_key
+
+            result = get_api_key("GEMINI_API_KEY")
+            assert result == "my-key"
+
+    @patch("core.llm_providers.os.environ", {"GEMINI_API_KEY": "env-key"})
+    def test_fallback_to_env(self):
+        """When st.secrets fails, falls back to environment variable."""
+        mock_st = MagicMock()
+        mock_st.secrets.get.side_effect = RuntimeError("no secrets")
+        with patch.dict(sys.modules, {"streamlit": mock_st}):
+            from core.llm_providers import get_api_key
+
+            result = get_api_key("GEMINI_API_KEY")
+            assert result == "env-key"
+
+    @patch("core.llm_providers.os.environ", {"GEMINI_API_KEY": ""})
+    def test_empty_string_returns_none(self):
+        """Empty string env var returns None (the `or None` guard)."""
+        mock_st = MagicMock()
+        mock_st.secrets.get.side_effect = RuntimeError("no secrets")
+        with patch.dict(sys.modules, {"streamlit": mock_st}):
+            from core.llm_providers import get_api_key
+
+            result = get_api_key("GEMINI_API_KEY")
+            assert result is None
+
+
+# --- detect_provider (additional) ---
+
+
+class TestDetectProviderAdditional:
+    @patch("core.llm_providers.requests.get")
+    @patch("core.llm_providers.get_api_key", return_value="fake-key")
+    def test_gemini_key_no_sdk_falls_to_ollama(self, mock_key, mock_get):
+        """API key present but google.genai not installed -> falls to Ollama."""
+        mock_get.return_value = MagicMock(status_code=200)
+        # Ensure google.genai is NOT in sys.modules (natural in test env)
+        with patch.dict(sys.modules, {"google.genai": None}):
+            from core.llm_providers import detect_provider
+
+            result = detect_provider()
+            assert result == "ollama"
+
+
+# --- Gemini provider (additional) ---
+
+
+class TestGeminiProviderAdditional:
+    def _genai_modules(self):
+        mock_genai = MagicMock()
+        mock_types = MagicMock()
+        mock_types.Content = MagicMock()
+        mock_types.Part = MagicMock()
+        mock_types.GenerateContentConfig = MagicMock()
+        mock_genai.types = mock_types
+        return {"google.genai": mock_genai, "google.genai.types": mock_types}
+
+    def test_chat_none_response_text(self):
+        """When response.text is None, chat returns None (no crash from .strip())."""
+        mock_response = MagicMock()
+        mock_response.text = None
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        with patch.dict(sys.modules, self._genai_modules()):
+            with patch("core.llm_providers.gemini._get_client", return_value=mock_client):
+                from core.llm_providers.gemini import chat
+
+                result = chat("Some question")
+                assert result is None
