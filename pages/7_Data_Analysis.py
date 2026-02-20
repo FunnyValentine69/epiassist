@@ -1,5 +1,6 @@
 """Data Analysis page for uploading and analyzing epidemiological datasets."""
 
+import math
 from pathlib import Path
 
 import pandas as pd
@@ -40,13 +41,34 @@ from utils.ui_helpers import plot_download_button, robustness_badge
 
 _DEMO_CSV = Path(__file__).resolve().parent.parent / "data" / "demo_epi.csv"
 
-NUMERIC_STAT_KEYS = ["n", "Mean", "Median", "SD", "Q1", "Q3", "Min", "Max"]
-NUMERIC_STAT_FIELDS = ["n", "mean", "median", "sd", "q1", "q3", "min", "max"]
+NUMERIC_STAT_KEYS = [
+    "n", "Missing %", "Mean", "95% CI", "Median", "Mode",
+    "SD", "Variance", "IQR", "Min", "Max", "Skewness", "Kurtosis",
+]
+NUMERIC_STAT_FIELDS = [
+    "n", "missing_pct", "mean", "_ci_fmt", "median", "mode",
+    "sd", "variance", "iqr", "min", "max", "skewness", "kurtosis",
+]
+
+
+def _valid_number(v: object) -> bool:
+    """Check if a value is a finite number (not None, NaN, or inf)."""
+    return v is not None and isinstance(v, (int, float)) and math.isfinite(v)
 
 
 def _numeric_stats_df(stats: dict) -> pd.DataFrame:
     """Build a single-row DataFrame from numeric descriptive stats."""
-    return pd.DataFrame([dict(zip(NUMERIC_STAT_KEYS, [stats[f] for f in NUMERIC_STAT_FIELDS]))])
+    # Format 95% CI as a single string
+    ci_lo = stats.get("ci_lower")
+    ci_hi = stats.get("ci_upper")
+    ci_fmt = f"{ci_lo:.2f}\u2013{ci_hi:.2f}" if _valid_number(ci_lo) and _valid_number(ci_hi) else "\u2014"
+    row = {}
+    for key, field in zip(NUMERIC_STAT_KEYS, NUMERIC_STAT_FIELDS):
+        if field == "_ci_fmt":
+            row[key] = ci_fmt
+        else:
+            row[key] = stats.get(field)
+    return pd.DataFrame([row])
 
 st.set_page_config(page_title="Data Analysis - EpiAssist", layout="wide")
 
@@ -406,6 +428,52 @@ with tab3:
                 "design effects (strata, PSUs)."
             )
 
+        # --- Summary table across all numeric variables ---
+        numeric_cols = [s for s in col_summary if s["type"] == "numeric" and s["column"] != desc_weight_col]
+        if numeric_cols:
+            st.markdown("#### Numeric Variables Summary")
+            summary_rows = []
+            for s in numeric_cols:
+                col_name = s["column"]
+                series = df_desc[col_name]
+                try:
+                    if desc_weight_col:
+                        st_dict = weighted_stats_numeric(series, df_desc[desc_weight_col])
+                    else:
+                        st_dict = descriptive_stats_numeric(series)
+                except Exception as e:
+                    st.warning(f"Could not compute stats for '{col_name}': {e}")
+                    continue
+                ci_lo = st_dict.get("ci_lower")
+                ci_hi = st_dict.get("ci_upper")
+                ci_fmt = f"{ci_lo:.2f}\u2013{ci_hi:.2f}" if _valid_number(ci_lo) and _valid_number(ci_hi) else "\u2014"
+                summary_rows.append({
+                    "Variable": col_name,
+                    "n": st_dict["n"],
+                    "Missing %": st_dict.get("missing_pct", 0),
+                    "Mean": st_dict.get("mean"),
+                    "95% CI": ci_fmt,
+                    "Median": st_dict.get("median"),
+                    "SD": st_dict.get("sd"),
+                    "IQR": st_dict.get("iqr"),
+                    "Min": st_dict.get("min"),
+                    "Max": st_dict.get("max"),
+                })
+            summary_df = pd.DataFrame(summary_rows)
+            st.dataframe(summary_df, hide_index=True, use_container_width=True)
+            st.download_button(
+                "Download Summary (CSV)",
+                data=summary_df.to_csv(index=False),
+                file_name="descriptive_summary.csv",
+                mime="text/csv",
+            )
+            st.divider()
+
+        # --- Per-variable details ---
+        desc_plot_type = st.radio(
+            "Plot type", ["Histogram", "Box Plot"], horizontal=True, key="desc_plot_type",
+        )
+
         for s in col_summary:
             col_name = s["column"]
             series = df_desc[col_name]
@@ -415,6 +483,7 @@ with tab3:
                 continue
 
             with st.expander(f"**{col_name}** ({s['type']})", expanded=False):
+              try:
                 if s["type"] == "numeric":
                     # Check if exposure is assigned for grouped stats
                     if "data_exposure_col" in st.session_state:
@@ -436,22 +505,35 @@ with tab3:
                                     if "effective_n" in stats and stats["effective_n"] is not None:
                                         st.markdown(f"Eff. N = {stats['effective_n']}")
 
-                        # Histogram overlaid by exposure group
+                        # Visualization by exposure group
                         fig = go.Figure()
-                        for group in grouped:
-                            subset = df_desc[df_desc[exp_col] == group][col_name].dropna()
-                            fig.add_trace(go.Histogram(
-                                x=subset,
-                                name=f"{exp_col}={group}",
-                                opacity=0.6,
-                            ))
-                        fig.update_layout(
-                            barmode="overlay",
-                            title=f"{col_name} by {exp_col}",
-                            xaxis_title=col_name,
-                            yaxis_title="Count",
-                            height=300,
-                        )
+                        if desc_plot_type == "Box Plot":
+                            for group in grouped:
+                                subset = df_desc[df_desc[exp_col] == group][col_name].dropna()
+                                fig.add_trace(go.Box(
+                                    y=subset,
+                                    name=f"{exp_col}={group}",
+                                ))
+                            fig.update_layout(
+                                title=f"{col_name} by {exp_col}",
+                                yaxis_title=col_name,
+                                height=350,
+                            )
+                        else:
+                            for group in grouped:
+                                subset = df_desc[df_desc[exp_col] == group][col_name].dropna()
+                                fig.add_trace(go.Histogram(
+                                    x=subset,
+                                    name=f"{exp_col}={group}",
+                                    opacity=0.6,
+                                ))
+                            fig.update_layout(
+                                barmode="overlay",
+                                title=f"{col_name} by {exp_col}",
+                                xaxis_title=col_name,
+                                yaxis_title="Count",
+                                height=300,
+                            )
                         st.plotly_chart(fig, use_container_width=True)
                     else:
                         if desc_weight_col:
@@ -462,28 +544,62 @@ with tab3:
                         if "effective_n" in stats and stats["effective_n"] is not None:
                             st.markdown(f"Eff. N = {stats['effective_n']}")
 
-                        # Simple histogram
-                        fig = go.Figure(go.Histogram(x=series.dropna()))
-                        fig.update_layout(
-                            title=col_name,
-                            xaxis_title=col_name,
-                            yaxis_title="Count",
-                            height=300,
-                        )
+                        # Visualization
+                        if desc_plot_type == "Box Plot":
+                            fig = go.Figure(go.Box(y=series.dropna(), name=col_name))
+                            fig.update_layout(title=col_name, yaxis_title=col_name, height=350)
+                        else:
+                            fig = go.Figure(go.Histogram(x=series.dropna()))
+                            fig.update_layout(
+                                title=col_name,
+                                xaxis_title=col_name,
+                                yaxis_title="Count",
+                                height=300,
+                            )
                         st.plotly_chart(fig, use_container_width=True)
                 else:
                     # Categorical: frequency table
                     if desc_weight_col:
-                        stats = weighted_stats_categorical(series, df_desc[desc_weight_col])
+                        cat_stats = weighted_stats_categorical(series, df_desc[desc_weight_col])
                     else:
-                        stats = descriptive_stats_categorical(series)
-                    freq_df = pd.DataFrame(stats["categories"])
+                        cat_stats = descriptive_stats_categorical(series)
+                    freq_df = pd.DataFrame(cat_stats["categories"])
                     if not freq_df.empty:
                         freq_df.columns = ["Value", "Count", "Proportion"]
                         freq_df["Proportion"] = freq_df["Proportion"].apply(lambda x: f"{x:.1%}")
                         st.dataframe(freq_df, hide_index=True, use_container_width=True)
-                    if stats["n_missing"] > 0:
-                        st.markdown(f"Missing: {stats['n_missing']}")
+                    if cat_stats["n_missing"] > 0:
+                        st.markdown(f"Missing: {cat_stats['n_missing']} ({cat_stats['n_missing'] / len(series) * 100:.1f}%)")
+
+                    # Grouped categorical by exposure
+                    if "data_exposure_col" in st.session_state:
+                        exp_col = st.session_state.data_exposure_col
+                        if col_name != exp_col:
+                            groups = df_desc[exp_col].dropna().unique()
+                            if 0 < len(groups) <= 10:
+                                st.markdown(f"**By {exp_col}:**")
+                                try:
+                                    sorted_groups = sorted(groups)
+                                except TypeError:
+                                    sorted_groups = sorted(groups, key=str)
+                                group_cols = st.columns(len(sorted_groups))
+                                for gi, grp in enumerate(sorted_groups):
+                                    with group_cols[gi]:
+                                        st.markdown(f"**{exp_col} = {grp}**")
+                                        grp_series = df_desc.loc[df_desc[exp_col] == grp, col_name]
+                                        if desc_weight_col:
+                                            grp_stats = weighted_stats_categorical(
+                                                grp_series, df_desc.loc[df_desc[exp_col] == grp, desc_weight_col]
+                                            )
+                                        else:
+                                            grp_stats = descriptive_stats_categorical(grp_series)
+                                        grp_freq = pd.DataFrame(grp_stats["categories"])
+                                        if not grp_freq.empty:
+                                            grp_freq.columns = ["Value", "Count", "%"]
+                                            grp_freq["%"] = grp_freq["%"].apply(lambda x: f"{x:.1%}")
+                                            st.dataframe(grp_freq, hide_index=True, use_container_width=True)
+              except Exception as e:
+                st.error(f"Error computing stats for '{col_name}': {e}")
 
 
 # --- Tab 4: Cross-Tabulation ---

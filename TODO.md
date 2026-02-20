@@ -24,7 +24,7 @@ _28 issues found during live testing on Streamlit Cloud. Organized by fix phase.
 ### Phase 4: Data Analysis Overhaul
 - [x] **4A. Built-in demo dataset** — Synthetic NHANES-style dataset (250 rows, 9 columns) with pre-assigned roles
 - [x] **4B. Variable roles: Add explanations** — Added role descriptions above each selector
-- [ ] **4C. Descriptive statistics: Full summary** — Add variance, IQR, skewness, kurtosis, mode, missing %, CI for mean; box plots; grouped categorical stats
+- [x] **4C. Descriptive statistics: Full summary** — Added variance, IQR, skewness, kurtosis, mode, missing %, 95% CI for mean; box plot toggle; grouped categorical stats by exposure; numeric summary table with CSV download
 - [x] **4D. Tab-level guidance** — Added brief explanation at top of each analysis tab
 
 ### Phase 5: Export & Reports Overhaul

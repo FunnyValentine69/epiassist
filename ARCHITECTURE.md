@@ -206,6 +206,8 @@ def run_meta_analysis(studies: list[dict], measure_type: str, model: str = "both
 def load_data(source: bytes | str, format: str) -> pd.DataFrame
 def summarize_columns(df: pd.DataFrame) -> list[dict]
 def descriptive_stats_numeric(series: pd.Series) -> dict
+    # Returns: n, n_missing, missing_pct, mean, median, mode, sd, variance,
+    #   q1, q3, iqr, min, max, skewness, kurtosis, ci_lower, ci_upper
 def descriptive_stats_categorical(series: pd.Series) -> dict
 def grouped_descriptive_stats(df: pd.DataFrame, variable: str, group_by: str) -> dict
 def weighted_stats_numeric(series: pd.Series, weights: pd.Series) -> dict
@@ -650,7 +652,7 @@ python scripts/diagnose_extraction.py ./my_papers  # Custom folder
 
 ## Testing
 
-577 tests across 20 files. No Streamlit or network dependencies in any test.
+595 tests across 20 files. No Streamlit or network dependencies in any test.
 
 ### Coverage Map
 
@@ -663,7 +665,7 @@ python scripts/diagnose_extraction.py ./my_papers  # Custom folder
 | `test_confounder_detector.py` | `confounder_detector.py` | 21 | Graph analysis (confounders, paths, adjustment) |
 | `test_confounder_matching.py` | `confounder_detector.py` | 15 | Name normalization, column matching |
 | `test_paper_parser.py` | `paper_parser.py` | 55 | Regex extraction, PDF construction |
-| `test_data_analyzer.py` | `data_analyzer.py` | 30 | Data upload, descriptive stats, cross-tab |
+| `test_data_analyzer.py` | `data_analyzer.py` | 60 | Data upload, descriptive stats (enhanced), cross-tab |
 | `test_meta_analysis.py` | `meta_analysis.py` | 36 | Fixed/random effects, heterogeneity |
 | `test_regression.py` | `regression.py` | 22 | Logistic, linear, Poisson models |
 | `test_propensity_score.py` | `propensity_score.py` | 50 | IPTW, balance, treatment effects |

@@ -173,6 +173,137 @@ class TestDescriptiveStatsNumeric:
 
 
 # ============================================================
+# TestDescriptiveStatsNumericEnhanced
+# ============================================================
+
+class TestDescriptiveStatsNumericEnhanced:
+    """Tests for the enhanced fields in descriptive_stats_numeric."""
+
+    def test_variance_equals_sd_squared(self):
+        series = pd.Series([2, 4, 6, 8, 10])
+        stats = descriptive_stats_numeric(series)
+        assert abs(stats["variance"] - stats["sd"] ** 2) < 0.001
+
+    def test_iqr_present(self):
+        series = pd.Series([1, 2, 3, 4, 5, 6, 7, 8])
+        stats = descriptive_stats_numeric(series)
+        assert stats["iqr"] == round(stats["q3"] - stats["q1"], 4)
+
+    def test_skewness_symmetric(self):
+        """A symmetric distribution should have skewness near zero."""
+        series = pd.Series([1, 2, 3, 4, 5, 6, 7, 8, 9])
+        stats = descriptive_stats_numeric(series)
+        assert abs(stats["skewness"]) < 0.5
+
+    def test_kurtosis_normal_like(self):
+        """Normal-like data should have excess kurtosis near zero."""
+        np.random.seed(42)
+        series = pd.Series(np.random.normal(0, 1, 1000))
+        stats = descriptive_stats_numeric(series)
+        assert abs(stats["kurtosis"]) < 1.0
+
+    def test_mode_returns_most_frequent(self):
+        series = pd.Series([1, 2, 2, 3, 3, 3])
+        stats = descriptive_stats_numeric(series)
+        assert stats["mode"] == 3.0
+
+    def test_missing_count_and_pct(self):
+        series = pd.Series([1, 2, None, 4, None])
+        stats = descriptive_stats_numeric(series)
+        assert stats["n_missing"] == 2
+        assert stats["missing_pct"] == 40.0
+
+    def test_ci_for_mean(self):
+        """95% CI should contain the sample mean."""
+        series = pd.Series([10, 20, 30, 40, 50])
+        stats = descriptive_stats_numeric(series)
+        assert stats["ci_lower"] is not None
+        assert stats["ci_upper"] is not None
+        assert stats["ci_lower"] < stats["mean"] < stats["ci_upper"]
+
+    def test_ci_none_for_single_value(self):
+        series = pd.Series([5.0])
+        stats = descriptive_stats_numeric(series)
+        assert stats["ci_lower"] is None
+        assert stats["ci_upper"] is None
+
+    def test_skewness_none_for_two_values(self):
+        series = pd.Series([1, 2])
+        stats = descriptive_stats_numeric(series)
+        assert stats["skewness"] is None
+
+    def test_kurtosis_none_for_three_values(self):
+        series = pd.Series([1, 2, 3])
+        stats = descriptive_stats_numeric(series)
+        assert stats["kurtosis"] is None
+
+    def test_zero_variance_ci_equals_mean(self):
+        """Zero-variance data should have CI = [mean, mean]."""
+        series = pd.Series([5.0, 5.0, 5.0])
+        stats = descriptive_stats_numeric(series)
+        assert stats["ci_lower"] == stats["mean"]
+        assert stats["ci_upper"] == stats["mean"]
+
+    def test_inf_values_filtered(self):
+        """Inf values should be excluded, not poison stats."""
+        series = pd.Series([1.0, float("inf"), 3.0, 4.0])
+        stats = descriptive_stats_numeric(series)
+        assert stats["n"] == 3  # inf excluded
+        assert stats["mean"] is not None
+        # Mean of [1, 3, 4] is not inf
+        assert stats["mean"] < 100
+
+    def test_empty_returns_all_none(self):
+        series = pd.Series([], dtype=float)
+        stats = descriptive_stats_numeric(series)
+        assert stats["variance"] is None
+        assert stats["skewness"] is None
+        assert stats["kurtosis"] is None
+        assert stats["mode"] is None
+        assert stats["ci_lower"] is None
+
+
+# ============================================================
+# TestWeightedStatsNumericEnhanced
+# ============================================================
+
+class TestWeightedStatsNumericEnhanced:
+    """Tests for enhanced fields in weighted_stats_numeric."""
+
+    def test_variance_equals_sd_squared(self):
+        series = pd.Series([2.0, 4.0, 6.0, 8.0, 10.0])
+        weights = pd.Series([1.0, 1.0, 1.0, 1.0, 1.0])
+        stats = weighted_stats_numeric(series, weights)
+        assert abs(stats["variance"] - stats["sd"] ** 2) < 0.001
+
+    def test_missing_pct(self):
+        series = pd.Series([1.0, 2.0, np.nan, 4.0])
+        weights = pd.Series([1.0, 1.0, 1.0, 1.0])
+        stats = weighted_stats_numeric(series, weights)
+        assert stats["n_missing"] == 1
+        assert stats["missing_pct"] == 25.0
+
+    def test_ci_present(self):
+        series = pd.Series([10.0, 20.0, 30.0, 40.0, 50.0])
+        weights = pd.Series([1.0, 1.0, 1.0, 1.0, 1.0])
+        stats = weighted_stats_numeric(series, weights)
+        assert stats["ci_lower"] is not None
+        assert stats["ci_lower"] < stats["mean"] < stats["ci_upper"]
+
+    def test_mode_present(self):
+        series = pd.Series([1.0, 2.0, 2.0, 3.0])
+        weights = pd.Series([1.0, 1.0, 1.0, 1.0])
+        stats = weighted_stats_numeric(series, weights)
+        assert stats["mode"] == 2.0
+
+    def test_skewness_present(self):
+        series = pd.Series([1.0, 2.0, 3.0, 4.0, 5.0])
+        weights = pd.Series([1.0, 1.0, 1.0, 1.0, 1.0])
+        stats = weighted_stats_numeric(series, weights)
+        assert stats["skewness"] is not None
+
+
+# ============================================================
 # TestDescriptiveStatsCategorical
 # ============================================================
 
