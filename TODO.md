@@ -32,7 +32,7 @@ _28 issues found during live testing on Streamlit Cloud. Organized by fix phase.
 - [x] **5B. PDF report: Capture Data Analysis results** — Cross-tab and MH results now stored in session state
 
 ### Phase 6: Paper Analyzer Rework (Future)
-- [ ] **6A. Cloud LLM solution** — Explore Gemini API free tier or on-instance small models
+- [x] **6A. Cloud LLM solution** — Provider-agnostic abstraction: Gemini (cloud, free tier) + Ollama (local)
 - [ ] **6B. Improve regex extraction quality** — Audit against corpus of 10-20 real epi papers
 - [ ] **6C. Explore CV-based text detection** — Research feasibility of bbox/segm for table/figure extraction
 - [ ] **6D. Visual theme polish** — Improve color palette, card layouts, typography

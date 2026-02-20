@@ -173,14 +173,45 @@ def find_weighted_statistics(text: str, page: int = 1) -> list[dict]
     # Returns dicts with: stat_type, value, weight_method (str|None), context, page
 ```
 
-#### llm_extractor.py (optional — requires LangExtract + Ollama)
+#### llm_extractor.py (provider-agnostic — delegates to llm_providers)
 ```python
-def is_llm_available(model_id: str = "llama3.1:8b") -> bool
-    # Checks langextract importable + Ollama server reachable
-def extract_with_llm(text: str, page: int = 1, model_id: str = "llama3.1:8b") -> dict[str, list[dict]]
-    # LangExtract extraction for a single page, returns same 8-key dict as paper_results
+def is_llm_available() -> tuple[bool, str | None]
+    # Returns (available, provider_name) via detect_provider()
+def extract_with_llm(text: str, page: int = 1) -> dict[str, list[dict]]
+    # Delegates to best available provider, returns same 8-key dict as paper_results
 def merge_results(regex_results: dict, llm_results: dict) -> dict[str, list[dict]]
     # Deduplicates using float-equal comparison, tags source="regex"|"llm"
+```
+
+#### llm_providers/ (LLM provider abstraction package)
+```python
+# __init__.py — Registry and auto-detection
+def get_api_key(key_name: str) -> str | None
+    # Checks st.secrets first, falls back to os.environ
+def detect_provider() -> str | None
+    # Priority: gemini (API key + SDK) > ollama (localhost) > None
+def get_provider_functions(name: str) -> dict
+    # Lazy-imports provider module, returns {"extract_stats": ..., "chat": ...}
+def provider_display_name(name: str | None) -> str
+    # "Gemini (cloud)" / "Ollama (local)" / "None"
+
+# prompts.py — Shared extraction prompt and few-shot example
+EXTRACTION_SYSTEM_PROMPT: str  # JSON-output system prompt for all providers
+FEW_SHOT_USER: str             # Example input text
+FEW_SHOT_ASSISTANT: str        # Example JSON output
+
+# _parse.py — Shared JSON response parser
+CATEGORIES: list[str]          # 8 category keys
+def parse_extraction_response(raw_json: str, page: int) -> dict[str, list[dict]]
+    # Defensive JSON parsing with per-category validators
+
+# ollama.py — Local inference via Ollama HTTP API
+def extract_stats(text: str, page: int) -> dict[str, list[dict]]
+def chat(prompt: str) -> str | None
+
+# gemini.py — Cloud inference via google-genai SDK
+def extract_stats(text: str, page: int) -> dict[str, list[dict]]
+def chat(prompt: str) -> str | None
 ```
 
 #### power_calculator.py
@@ -418,10 +449,10 @@ SMD_BALANCE_THRESHOLD = 0.1  # Propensity score covariate balance (Austin 2009)
                                              │                  │
                                              ▼                  │
                                     ┌─────────────────┐         │
-                                    │  LLM Extractor  │         │
-                                    │  (LangExtract   │         │
-                                    │   + Ollama)     │         │
-                                    │  [optional]     │         │
+                                    │  LLM Providers  │         │
+                                    │  Gemini (cloud)  │         │
+                                    │  Ollama (local)  │         │
+                                    │  [auto-detect]  │         │
                                     └────────┬────────┘         │
                                              │                  │
                                              ▼                  ▼
@@ -652,7 +683,7 @@ python scripts/diagnose_extraction.py ./my_papers  # Custom folder
 
 ## Testing
 
-595 tests across 20 files. No Streamlit or network dependencies in any test.
+623 tests across 21 files. No Streamlit or network dependencies in any test.
 
 ### Coverage Map
 
@@ -674,7 +705,8 @@ python scripts/diagnose_extraction.py ./my_papers  # Custom folder
 | `test_direct_standardization.py` | `direct_standardization.py` | 28 | Age-adjusted rates |
 | `test_smr_calculator.py` | `smr_calculator.py` | 22 | Standardized mortality ratios |
 | `test_report_generator.py` | `report_generator.py` | 28 | Methods section + PDF generation |
-| `test_llm_extractor.py` | `llm_extractor.py` | 27 | LLM extraction (mocked Ollama) |
+| `test_llm_extractor.py` | `llm_extractor.py` | 18 | Provider-agnostic LLM extraction |
+| `test_llm_providers.py` | `llm_providers/` | 38 | Provider detection, parsing, Ollama/Gemini (mocked) |
 | `test_methods_generator.py` | `methods_generator.py` | 39 | Methods text generation |
 | `tests/utils/test_ui_helpers.py` | `utils/ui_helpers.py` | 14 | Styled banners, robustness badge, plot download |
 | `test_smoke.py` | *(integration)* | 10 | Module imports + cross-module flows |

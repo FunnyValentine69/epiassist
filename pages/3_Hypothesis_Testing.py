@@ -1,9 +1,8 @@
 """Hypothesis Testing page for formal statistical inference."""
 
-import subprocess
-
 import streamlit as st
 
+from core.llm_providers import detect_provider, get_provider_functions
 from utils.constants import ALPHA_DEFAULT
 from utils.ui_helpers import styled_banner
 
@@ -18,15 +17,19 @@ Determine whether to reject or fail to reject the null hypothesis.
 st.divider()
 
 
-def call_ollama(question: str) -> str | None:
-    """Call Ollama to generate hypothesis framework from research question.
+def call_llm(question: str) -> str | None:
+    """Call the best available LLM to generate hypothesis framework.
 
     Args:
         question: The research question to analyze.
 
     Returns:
-        Generated text or None if failed.
+        Generated text or None if no provider available or on failure.
     """
+    provider = detect_provider()
+    if provider is None:
+        return None
+
     prompt = f"""You are an epidemiology research assistant. Given this research question: {question}
 
 Generate:
@@ -47,24 +50,17 @@ Generate:
 Be concise and specific to epidemiological research."""
 
     try:
-        result = subprocess.run(
-            ["ollama", "run", "llama3.2:latest", prompt],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        if result.returncode == 0:
-            return result.stdout.strip()
-        return None
-    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        funcs = get_provider_functions(provider)
+        return funcs["chat"](prompt)
+    except Exception:
         return None
 
 
-def parse_ollama_response(response: str) -> dict:
-    """Parse Ollama response to extract key fields.
+def parse_llm_response(response: str) -> dict:
+    """Parse LLM response to extract key fields.
 
     Args:
-        response: Raw response from Ollama.
+        response: Raw response from LLM.
 
     Returns:
         Dictionary with parsed fields.
@@ -125,20 +121,23 @@ research_question = st.text_input(
 
 col_btn, col_status = st.columns([1, 2])
 with col_btn:
-    generate_btn = st.button("Auto-Generate with AI", type="secondary")
+    if detect_provider():
+        generate_btn = st.button("Auto-Generate with AI", type="secondary")
+    else:
+        generate_btn = False
 
 if generate_btn and research_question:
-    with st.spinner("Generating with Ollama (llama3.2:latest)..."):
-        response = call_ollama(research_question)
+    with st.spinner("Generating with AI..."):
+        response = call_llm(research_question)
 
     if response:
-        parsed = parse_ollama_response(response)
+        parsed = parse_llm_response(response)
         st.session_state.hypo_ai_response = parsed
         st.session_state.hypo_h0 = parsed["h0"] if parsed["h0"] else st.session_state.get("hypo_h0", "")
         st.session_state.hypo_h1 = parsed["h1"] if parsed["h1"] else st.session_state.get("hypo_h1", "")
         st.success("Generated! Fields auto-filled below.")
     else:
-        st.info("AI auto-generation requires local Ollama installation.")
+        st.warning("AI generation failed. The provider may be temporarily unavailable.")
 
 # Show AI response if available
 if "hypo_ai_response" in st.session_state:
