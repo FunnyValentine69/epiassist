@@ -15,6 +15,7 @@ from core.paper_parser import (
     find_weighted_statistics,
 )
 from core.llm_extractor import is_llm_available, extract_with_llm, merge_results
+from core.llm_providers import provider_display_name
 
 st.set_page_config(page_title="Paper Analyzer - EpiAssist", layout="wide")
 
@@ -44,12 +45,12 @@ with col1:
         st.info("Upload a PDF to extract statistics.")
         extract_btn = False
 
-    llm_available = is_llm_available()
+    llm_available, llm_provider = is_llm_available()
     if llm_available:
         use_llm = st.checkbox(
-            "Enhance with AI (Ollama)",
+            f"Enhance with AI ({provider_display_name(llm_provider)})",
             value=False,
-            help="Run a second-pass LLM extraction via local Ollama to catch stats that regex misses.",
+            help="Run a second-pass LLM extraction to catch stats that regex misses.",
         )
     else:
         use_llm = False
@@ -141,7 +142,7 @@ with col2:
                 else:
                     llm_total = sum(len(v) for v in llm_all.values())
                     if llm_total == 0:
-                        st.warning("AI extraction returned no results. Check that Ollama is running with llama3.1:8b loaded.")
+                        st.warning("AI extraction returned no results.")
                     else:
                         st.info("AI found no additional statistics beyond regex.")
             else:
@@ -474,7 +475,7 @@ st.markdown("### How It Works")
 st.markdown("""
 1. **Text Extraction**: We use PyMuPDF to extract text from your PDF
 2. **Pattern Matching**: Regular expressions identify statistical measures
-3. **AI Enhancement** (optional): LLM second-pass via local Ollama catches stats regex misses
+3. **AI Enhancement** (optional): LLM second-pass (Gemini or Ollama) catches stats regex misses
 4. **Deduplication**: Regex and AI results are merged, duplicates removed
 5. **Structured Output**: Results are organized in tabs for easy review
 6. **Export**: Download extracted statistics as CSV

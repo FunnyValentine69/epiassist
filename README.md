@@ -122,42 +122,50 @@ Investigate the relationship between hearing loss and employment status using NH
 - **Graphviz** - DAG visualization
 - **SciPy / statsmodels** - Statistical calculations
 - **PyMuPDF** - PDF text extraction
-- **LangExtract** - Optional LLM-based stat extraction
+- **google-genai** - Gemini cloud LLM for AI extraction
 - **Plotly** - Interactive visualizations
 - **fpdf2** - PDF report generation
 - **Pandas** - Data manipulation
 
-## Optional: AI-Enhanced Extraction (Ollama)
+## AI-Enhanced Extraction (Cloud or Local)
 
-The Paper Analyzer can optionally use a local LLM via [Ollama](https://ollama.com) to catch statistics that regex patterns miss. This is completely free and runs locally.
+The Paper Analyzer and Hypothesis Testing pages use LLM extraction to catch statistics that regex patterns miss. Provider is auto-detected:
 
-### Setup
+### Option A: Gemini (Cloud — recommended for Streamlit Cloud)
+
+1. Get a free API key at [Google AI Studio](https://aistudio.google.com/apikey)
+2. Set it in `.streamlit/secrets.toml`:
+   ```toml
+   GEMINI_API_KEY = "your-key-here"
+   ```
+   Or as an environment variable: `export GEMINI_API_KEY=your-key-here`
+3. Uses `gemini-2.5-flash-lite` (free tier: 1,000 requests/day)
+
+### Option B: Ollama (Local — for offline/private use)
 
 ```bash
 # Install Ollama (macOS)
 brew install ollama
 
-# Pull the model (~4.7GB download)
-ollama pull llama3.1:8b
+# Pull the models
+ollama pull llama3.1:8b    # Paper Analyzer extraction
+ollama pull llama3.2:latest # Hypothesis Testing generation
 
-# Start the server (keep running in a separate terminal)
+# Start the server
 ollama serve
 ```
 
-### Usage
+### How It Works
 
-1. Start Ollama (`ollama serve`)
-2. Open Paper Analyzer in EpiAssist
-3. Check the "Enhance with AI (Ollama)" checkbox
-4. Upload a PDF and extract — the LLM runs a second pass after regex
-5. New results show "llm" in the Source column
-
-When Ollama isn't running, the checkbox is automatically disabled.
+- If a Gemini API key is found, Gemini is used (cloud-first priority)
+- If Ollama is running locally, Ollama is used
+- If neither is available, AI features are hidden (regex-only extraction still works)
+- The active provider is shown in the checkbox label: "Enhance with AI (Gemini (cloud))" or "Enhance with AI (Ollama (local))"
 
 ## Development
 
 ```bash
-# Run tests (563 tests across 19 files)
+# Run tests (623 tests across 21 files)
 pytest tests/
 
 # Run a single module's tests
