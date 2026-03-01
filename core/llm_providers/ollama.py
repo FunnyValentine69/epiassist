@@ -1,8 +1,12 @@
 """Ollama LLM provider — local inference via native HTTP API."""
 
+import logging
+
 import requests
 
-from core.llm_providers._parse import parse_extraction_response
+logger = logging.getLogger(__name__)
+
+from core.llm_providers._parse import _empty_results, parse_extraction_response
 from core.llm_providers.prompts import (
     EXTRACTION_SYSTEM_PROMPT,
     FEW_SHOT_ASSISTANT,
@@ -44,9 +48,8 @@ def extract_stats(text: str, page: int = 1) -> dict[str, list[dict]]:
         resp.raise_for_status()
         raw_json = resp.json()["message"]["content"]
         return parse_extraction_response(raw_json, page)
-    except Exception:
-        from core.llm_providers._parse import _empty_results
-
+    except Exception as e:
+        logger.warning("Ollama extraction failed: %s", e)
         return _empty_results()
 
 
@@ -71,5 +74,6 @@ def chat(prompt: str) -> str | None:
         )
         resp.raise_for_status()
         return resp.json()["message"]["content"].strip()
-    except Exception:
+    except Exception as e:
+        logger.warning("Ollama chat failed: %s", e)
         return None

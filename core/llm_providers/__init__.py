@@ -6,10 +6,13 @@ Supports Gemini (cloud) and Ollama (local). Provider selection is automatic:
 3. Neither -> None (LLM features hidden)
 """
 
+import logging
 import os
 from typing import Optional
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 def get_api_key(key_name: str) -> Optional[str]:
@@ -27,8 +30,8 @@ def get_api_key(key_name: str) -> Optional[str]:
         val = st.secrets.get(key_name)
         if val:
             return str(val)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("get_api_key: st.secrets lookup failed: %s", e)
     return os.environ.get(key_name) or None
 
 
@@ -52,8 +55,8 @@ def detect_provider() -> Optional[str]:
         resp = requests.get("http://localhost:11434", timeout=2)
         if resp.status_code == 200:
             return "ollama"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Ollama health check failed: %s", e)
 
     return None
 

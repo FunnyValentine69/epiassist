@@ -165,7 +165,7 @@ ollama serve
 ## Development
 
 ```bash
-# Run tests (623 tests across 21 files)
+# Run tests (642 tests across 21 files)
 pytest tests/
 
 # Run a single module's tests

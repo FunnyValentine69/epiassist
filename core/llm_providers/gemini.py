@@ -4,6 +4,8 @@ The google-genai import is deferred to function calls so this module
 can be imported (and tested) even when the package is not installed.
 """
 
+import logging
+
 from core.llm_providers import get_api_key
 from core.llm_providers._parse import _empty_results, parse_extraction_response
 from core.llm_providers.prompts import (
@@ -11,6 +13,8 @@ from core.llm_providers.prompts import (
     FEW_SHOT_ASSISTANT,
     FEW_SHOT_USER,
 )
+
+logger = logging.getLogger(__name__)
 
 EXTRACTION_MODEL = "gemini-2.5-flash-lite"
 CHAT_MODEL = "gemini-2.5-flash-lite"
@@ -61,7 +65,8 @@ def extract_stats(text: str, page: int = 1) -> dict[str, list[dict]]:
             ),
         )
         return parse_extraction_response(response.text, page)
-    except Exception:
+    except Exception as e:
+        logger.warning("Gemini extraction failed: %s", e)
         return _empty_results()
 
 
@@ -86,5 +91,6 @@ def chat(prompt: str) -> str | None:
             ),
         )
         return response.text.strip() if response.text else None
-    except Exception:
+    except Exception as e:
+        logger.warning("Gemini chat failed: %s", e)
         return None
