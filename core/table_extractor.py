@@ -30,7 +30,7 @@ def is_statsift_available() -> bool:
         import statsift
 
         return hasattr(statsift, "__version__")
-    except ImportError:
+    except Exception:
         return False
 
 
@@ -103,33 +103,14 @@ def convert_tables_to_results(
                     else f"Table {table.table_index + 1}: {col_name}"
                 )
 
-                if vtype == "effect_ci":
-                    effect_type = _infer_effect_type(col_name)
-                    adjusted = _infer_adjusted(col_name)
+                if vtype in ("effect_ci", "effect"):
                     results["effect_measures"].append(
                         {
-                            "type": effect_type,
+                            "type": _infer_effect_type(col_name),
                             "value": vals.get("effect"),
                             "ci_lower": vals.get("ci_lo"),
                             "ci_upper": vals.get("ci_hi"),
-                            "adjusted": adjusted,
-                            "adjusted_for": None,
-                            "context": context,
-                            "page": page,
-                            "source": "statsift",
-                        }
-                    )
-
-                elif vtype == "effect":
-                    effect_type = _infer_effect_type(col_name)
-                    adjusted = _infer_adjusted(col_name)
-                    results["effect_measures"].append(
-                        {
-                            "type": effect_type,
-                            "value": vals.get("effect"),
-                            "ci_lower": None,
-                            "ci_upper": None,
-                            "adjusted": adjusted,
+                            "adjusted": _infer_adjusted(col_name),
                             "adjusted_for": None,
                             "context": context,
                             "page": page,
@@ -220,9 +201,7 @@ def extract_from_pdf(pdf_bytes: bytes) -> dict[str, list[dict]] | None:
 
         paper_content = extract_content(conv_result)
         num_pages = (
-            len(conv_result.document.pages)
-            if hasattr(conv_result.document, "pages")
-            else 0
+            len(conv_result.document.pages) if hasattr(conv_result.document, "pages") else 0
         )
 
         result = build_result(
