@@ -16,6 +16,7 @@ from core.paper_parser import (
 )
 from core.llm_extractor import is_llm_available, extract_with_llm, merge_results
 from core.llm_providers import provider_display_name
+from core.table_extractor import is_statsift_available
 
 st.set_page_config(page_title="Paper Analyzer - EpiAssist", layout="wide")
 
@@ -55,6 +56,16 @@ with col1:
     else:
         use_llm = False
 
+    statsift_avail = is_statsift_available()
+    if statsift_avail:
+        use_statsift = st.checkbox(
+            "Extract from tables (StatSift)",
+            value=False,
+            help="Use CV-based table extraction to find statistics in PDF tables.",
+        )
+    else:
+        use_statsift = False
+
     st.markdown("### What We Extract")
     st.markdown("""
     - Effect Measures (OR, HR, RR, PR, IRR) with **adjusted/crude detection**
@@ -79,7 +90,9 @@ with col2:
 
                 # Validate extraction result
                 if not pages:
-                    st.error("Could not extract text from PDF. The file may be empty or corrupted.")
+                    st.error(
+                        "Could not extract text from PDF. The file may be empty or corrupted."
+                    )
                     st.stop()
 
                 # Store full text for preview (join all pages)
@@ -99,14 +112,26 @@ with col2:
                 weighted_statistics = []
 
                 for page_num, page_text in pages:
-                    effect_measures.extend(find_effect_measures(page_text, page=page_num))
-                    confidence_intervals.extend(find_confidence_intervals(page_text, page=page_num))
+                    effect_measures.extend(
+                        find_effect_measures(page_text, page=page_num)
+                    )
+                    confidence_intervals.extend(
+                        find_confidence_intervals(page_text, page=page_num)
+                    )
                     p_values.extend(find_p_values(page_text, page=page_num))
                     sample_sizes.extend(find_sample_sizes(page_text, page=page_num))
-                    beta_coefficients.extend(find_beta_coefficients(page_text, page=page_num))
-                    mean_differences.extend(find_mean_differences(page_text, page=page_num))
-                    standard_deviations.extend(find_standard_deviations(page_text, page=page_num))
-                    weighted_statistics.extend(find_weighted_statistics(page_text, page=page_num))
+                    beta_coefficients.extend(
+                        find_beta_coefficients(page_text, page=page_num)
+                    )
+                    mean_differences.extend(
+                        find_mean_differences(page_text, page=page_num)
+                    )
+                    standard_deviations.extend(
+                        find_standard_deviations(page_text, page=page_num)
+                    )
+                    weighted_statistics.extend(
+                        find_weighted_statistics(page_text, page=page_num)
+                    )
 
                 regex_results = {
                     "effect_measures": effect_measures,
@@ -152,6 +177,29 @@ with col2:
                     for item in final_results[cat]:
                         item["source"] = "regex"
 
+            # StatSift table extraction (optional)
+            if use_statsift:
+                with st.spinner("Extracting from tables (StatSift)..."):
+                    from core.table_extractor import extract_from_pdf
+
+                    table_results = extract_from_pdf(file_bytes)
+                    if table_results:
+                        pre_count = sum(len(v) for v in final_results.values())
+                        table_results = merge_results(final_results, table_results)
+                        final_results = table_results
+                        post_count = sum(len(v) for v in final_results.values())
+                        table_added = post_count - pre_count
+                        if table_added > 0:
+                            st.info(
+                                f"Table extraction found {table_added} additional statistic(s)"
+                            )
+                        else:
+                            st.info(
+                                "Table extraction found no additional statistics beyond text."
+                            )
+                    else:
+                        st.warning("Table extraction returned no results.")
+
             with st.spinner("Storing results..."):
                 # Store results
                 st.session_state.paper_results = final_results
@@ -166,7 +214,16 @@ with col2:
 
         # Tabs for each extraction type
         tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
-            ["Effect Measures", "Beta Coefficients", "CIs", "P-values", "Mean Diff", "SD/SE", "Weighted Stats", "Sample Sizes"]
+            [
+                "Effect Measures",
+                "Beta Coefficients",
+                "CIs",
+                "P-values",
+                "Mean Diff",
+                "SD/SE",
+                "Weighted Stats",
+                "Sample Sizes",
+            ]
         )
 
         with tab1:
@@ -184,7 +241,9 @@ with col2:
                     # Format Adjusted For column (truncate if long)
                     adj_for = item.get("adjusted_for")
                     if adj_for:
-                        adj_for_str = adj_for[:50] + "..." if len(adj_for) > 50 else adj_for
+                        adj_for_str = (
+                            adj_for[:50] + "..." if len(adj_for) > 50 else adj_for
+                        )
                     else:
                         adj_for_str = "-"
 
@@ -203,10 +262,18 @@ with col2:
                     )
                 st.dataframe(pd.DataFrame(em_data), use_container_width=True)
                 # Count adjusted vs crude vs unknown
-                adj_count = sum(1 for em in results["effect_measures"] if em.get("adjusted") is True)
-                crude_count = sum(1 for em in results["effect_measures"] if em.get("adjusted") is False)
+                adj_count = sum(
+                    1 for em in results["effect_measures"] if em.get("adjusted") is True
+                )
+                crude_count = sum(
+                    1
+                    for em in results["effect_measures"]
+                    if em.get("adjusted") is False
+                )
                 unk_count = len(results["effect_measures"]) - adj_count - crude_count
-                st.caption(f"Found {len(results['effect_measures'])} effect measure(s): {adj_count} adjusted, {crude_count} crude, {unk_count} unknown")
+                st.caption(
+                    f"Found {len(results['effect_measures'])} effect measure(s): {adj_count} adjusted, {crude_count} crude, {unk_count} unknown"
+                )
             else:
                 st.info("No effect measures found in this document.")
 
@@ -226,7 +293,9 @@ with col2:
                         }
                     )
                 st.dataframe(pd.DataFrame(beta_data), use_container_width=True)
-                st.caption(f"Found {len(results['beta_coefficients'])} beta coefficient(s)")
+                st.caption(
+                    f"Found {len(results['beta_coefficients'])} beta coefficient(s)"
+                )
             else:
                 st.info("No beta coefficients found in this document.")
 
@@ -260,7 +329,9 @@ with col2:
                             "Page": item["page"],
                             "P-value": item["value"],
                             "Operator": item["operator"],
-                            "Significant (α=0.05)": "Yes" if item["value"] < 0.05 else "No",
+                            "Significant (α=0.05)": "Yes"
+                            if item["value"] < 0.05
+                            else "No",
                             "Source": item.get("source", "regex"),
                             "Source Snippet": item["context"][:60] + "...",
                         }
@@ -285,7 +356,9 @@ with col2:
                         }
                     )
                 st.dataframe(pd.DataFrame(md_data), use_container_width=True)
-                st.caption(f"Found {len(results['mean_differences'])} mean difference(s)")
+                st.caption(
+                    f"Found {len(results['mean_differences'])} mean difference(s)"
+                )
             else:
                 st.info("No mean differences found in this document.")
 
@@ -304,7 +377,9 @@ with col2:
                         }
                     )
                 st.dataframe(pd.DataFrame(sd_data), use_container_width=True)
-                st.caption(f"Found {len(results['standard_deviations'])} SD/SE value(s)")
+                st.caption(
+                    f"Found {len(results['standard_deviations'])} SD/SE value(s)"
+                )
             else:
                 st.info("No standard deviations/errors found in this document.")
 
@@ -323,7 +398,9 @@ with col2:
                         }
                     )
                 st.dataframe(pd.DataFrame(ws_data), use_container_width=True)
-                st.caption(f"Found {len(results['weighted_statistics'])} weighted statistic(s)")
+                st.caption(
+                    f"Found {len(results['weighted_statistics'])} weighted statistic(s)"
+                )
             else:
                 st.info("No weighted statistics found in this document.")
 
@@ -476,9 +553,10 @@ st.markdown("""
 1. **Text Extraction**: We use PyMuPDF to extract text from your PDF
 2. **Pattern Matching**: Regular expressions identify statistical measures
 3. **AI Enhancement** (optional): LLM second-pass (Gemini or Ollama) catches stats regex misses
-4. **Deduplication**: Regex and AI results are merged, duplicates removed
-5. **Structured Output**: Results are organized in tabs for easy review
-6. **Export**: Download extracted statistics as CSV
+4. **Table Extraction** (optional): StatSift CV-based table detection extracts statistics from PDF tables
+5. **Deduplication**: All results are merged, duplicates removed
+6. **Structured Output**: Results are organized in tabs for easy review
+7. **Export**: Download extracted statistics as CSV
 
 **Patterns detected:**
 - `aOR = 2.5 (95% CI: 1.2-3.8)` → Adjusted odds ratio
