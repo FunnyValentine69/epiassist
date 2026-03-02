@@ -1,21 +1,20 @@
 """Paper Analyzer page for extracting statistics from PDFs."""
 
-import streamlit as st
 import pandas as pd
-
+import streamlit as st
+from core.llm_extractor import extract_with_llm, is_llm_available, merge_results
+from core.llm_providers import provider_display_name
 from core.paper_parser import (
     extract_text_from_pdf,
-    find_effect_measures,
+    find_beta_coefficients,
     find_confidence_intervals,
+    find_effect_measures,
+    find_mean_differences,
     find_p_values,
     find_sample_sizes,
-    find_beta_coefficients,
-    find_mean_differences,
     find_standard_deviations,
     find_weighted_statistics,
 )
-from core.llm_extractor import is_llm_available, extract_with_llm, merge_results
-from core.llm_providers import provider_display_name
 from core.table_extractor import is_statsift_available
 
 st.set_page_config(page_title="Paper Analyzer - EpiAssist", layout="wide")
@@ -101,48 +100,22 @@ with col2:
                 st.session_state.paper_filename = uploaded_file.name
 
             with st.spinner("Finding statistics..."):
-                # Extract statistics from each page
-                effect_measures = []
-                confidence_intervals = []
-                p_values = []
-                sample_sizes = []
-                beta_coefficients = []
-                mean_differences = []
-                standard_deviations = []
-                weighted_statistics = []
-
-                for page_num, page_text in pages:
-                    effect_measures.extend(
-                        find_effect_measures(page_text, page=page_num)
-                    )
-                    confidence_intervals.extend(
-                        find_confidence_intervals(page_text, page=page_num)
-                    )
-                    p_values.extend(find_p_values(page_text, page=page_num))
-                    sample_sizes.extend(find_sample_sizes(page_text, page=page_num))
-                    beta_coefficients.extend(
-                        find_beta_coefficients(page_text, page=page_num)
-                    )
-                    mean_differences.extend(
-                        find_mean_differences(page_text, page=page_num)
-                    )
-                    standard_deviations.extend(
-                        find_standard_deviations(page_text, page=page_num)
-                    )
-                    weighted_statistics.extend(
-                        find_weighted_statistics(page_text, page=page_num)
-                    )
-
-                regex_results = {
-                    "effect_measures": effect_measures,
-                    "confidence_intervals": confidence_intervals,
-                    "p_values": p_values,
-                    "sample_sizes": sample_sizes,
-                    "beta_coefficients": beta_coefficients,
-                    "mean_differences": mean_differences,
-                    "standard_deviations": standard_deviations,
-                    "weighted_statistics": weighted_statistics,
+                # Map each result category to its extraction function
+                extractors = {
+                    "effect_measures": find_effect_measures,
+                    "confidence_intervals": find_confidence_intervals,
+                    "p_values": find_p_values,
+                    "sample_sizes": find_sample_sizes,
+                    "beta_coefficients": find_beta_coefficients,
+                    "mean_differences": find_mean_differences,
+                    "standard_deviations": find_standard_deviations,
+                    "weighted_statistics": find_weighted_statistics,
                 }
+
+                regex_results: dict[str, list] = {cat: [] for cat in extractors}
+                for page_num, page_text in pages:
+                    for cat, fn in extractors.items():
+                        regex_results[cat].extend(fn(page_text, page=page_num))
 
             # LLM second pass (optional)
             if use_llm:
@@ -194,9 +167,7 @@ with col2:
                                 f"Table extraction found {table_added} additional statistic(s)"
                             )
                         else:
-                            st.info(
-                                "Table extraction found no additional statistics beyond text."
-                            )
+                            st.info("Table extraction found no additional statistics beyond text.")
                     else:
                         st.warning("Table extraction returned no results.")
 
@@ -241,9 +212,7 @@ with col2:
                     # Format Adjusted For column (truncate if long)
                     adj_for = item.get("adjusted_for")
                     if adj_for:
-                        adj_for_str = (
-                            adj_for[:50] + "..." if len(adj_for) > 50 else adj_for
-                        )
+                        adj_for_str = adj_for[:50] + "..." if len(adj_for) > 50 else adj_for
                     else:
                         adj_for_str = "-"
 
@@ -266,9 +235,7 @@ with col2:
                     1 for em in results["effect_measures"] if em.get("adjusted") is True
                 )
                 crude_count = sum(
-                    1
-                    for em in results["effect_measures"]
-                    if em.get("adjusted") is False
+                    1 for em in results["effect_measures"] if em.get("adjusted") is False
                 )
                 unk_count = len(results["effect_measures"]) - adj_count - crude_count
                 st.caption(
@@ -293,9 +260,7 @@ with col2:
                         }
                     )
                 st.dataframe(pd.DataFrame(beta_data), use_container_width=True)
-                st.caption(
-                    f"Found {len(results['beta_coefficients'])} beta coefficient(s)"
-                )
+                st.caption(f"Found {len(results['beta_coefficients'])} beta coefficient(s)")
             else:
                 st.info("No beta coefficients found in this document.")
 
@@ -314,9 +279,7 @@ with col2:
                         }
                     )
                 st.dataframe(pd.DataFrame(ci_data), use_container_width=True)
-                st.caption(
-                    f"Found {len(results['confidence_intervals'])} confidence interval(s)"
-                )
+                st.caption(f"Found {len(results['confidence_intervals'])} confidence interval(s)")
             else:
                 st.info("No confidence intervals found in this document.")
 
@@ -329,9 +292,7 @@ with col2:
                             "Page": item["page"],
                             "P-value": item["value"],
                             "Operator": item["operator"],
-                            "Significant (α=0.05)": "Yes"
-                            if item["value"] < 0.05
-                            else "No",
+                            "Significant (α=0.05)": "Yes" if item["value"] < 0.05 else "No",
                             "Source": item.get("source", "regex"),
                             "Source Snippet": item["context"][:60] + "...",
                         }
@@ -356,9 +317,7 @@ with col2:
                         }
                     )
                 st.dataframe(pd.DataFrame(md_data), use_container_width=True)
-                st.caption(
-                    f"Found {len(results['mean_differences'])} mean difference(s)"
-                )
+                st.caption(f"Found {len(results['mean_differences'])} mean difference(s)")
             else:
                 st.info("No mean differences found in this document.")
 
@@ -377,9 +336,7 @@ with col2:
                         }
                     )
                 st.dataframe(pd.DataFrame(sd_data), use_container_width=True)
-                st.caption(
-                    f"Found {len(results['standard_deviations'])} SD/SE value(s)"
-                )
+                st.caption(f"Found {len(results['standard_deviations'])} SD/SE value(s)")
             else:
                 st.info("No standard deviations/errors found in this document.")
 
@@ -398,9 +355,7 @@ with col2:
                         }
                     )
                 st.dataframe(pd.DataFrame(ws_data), use_container_width=True)
-                st.caption(
-                    f"Found {len(results['weighted_statistics'])} weighted statistic(s)"
-                )
+                st.caption(f"Found {len(results['weighted_statistics'])} weighted statistic(s)")
             else:
                 st.info("No weighted statistics found in this document.")
 
