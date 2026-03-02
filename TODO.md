@@ -34,7 +34,7 @@ _28 issues found during live testing on Streamlit Cloud. Organized by fix phase.
 ### Phase 6: Paper Analyzer Rework (Future)
 - [x] **6A. Cloud LLM solution** — Provider-agnostic abstraction: Gemini (cloud, free tier) + Ollama (local)
 - [ ] **6B. Improve regex extraction quality** — Audit against corpus of 10-20 real epi papers
-- [ ] **6C. Explore CV-based text detection** — Research feasibility of bbox/segm for table/figure extraction
+- [x] **6C. CV-based table extraction** — Built **StatSift** (`~/Projects/statsift/`): Docling-powered PDF table detection + extraction with JSON/CSV/Markdown output. Integrated as optional EpiAssist backend via `core/table_extractor.py`.
 - [ ] **6D. Visual theme polish** — Improve color palette, card layouts, typography
 
 ---

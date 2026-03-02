@@ -173,6 +173,18 @@ def find_weighted_statistics(text: str, page: int = 1) -> list[dict]
     # Returns dicts with: stat_type, value, weight_method (str|None), context, page
 ```
 
+#### table_extractor.py (optional StatSift integration)
+```python
+def is_statsift_available() -> bool
+    # Returns True if statsift package is importable
+def convert_tables_to_results(tables: list) -> dict[str, list[dict]]
+    # Converts StatSift TableResult objects into EpiAssist's 8-key result format
+    # Maps EFFECT_CI → effect_measures, PVALUE → p_values, MEAN_SD → standard_deviations, etc.
+    # Infers effect type (OR/HR/RR) from column header text
+def extract_from_pdf(pdf_bytes: bytes) -> dict[str, list[dict]] | None
+    # Full pipeline: PDF → StatSift extraction → EpiAssist format. Returns None if unavailable.
+```
+
 #### llm_extractor.py (provider-agnostic — delegates to llm_providers)
 ```python
 def is_llm_available() -> tuple[bool, str | None]
