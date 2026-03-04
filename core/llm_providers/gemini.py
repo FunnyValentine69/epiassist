@@ -16,8 +16,8 @@ from core.llm_providers.prompts import (
 
 logger = logging.getLogger(__name__)
 
-EXTRACTION_MODEL = "gemini-2.5-flash-lite"
-CHAT_MODEL = "gemini-2.5-flash-lite"
+EXTRACTION_MODEL = "gemini-2.0-flash"
+CHAT_MODEL = "gemini-2.0-flash"
 
 
 def _get_client():
