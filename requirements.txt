@@ -1,4 +1,4 @@
-streamlit>=1.43.2
+streamlit>=1.56.0
 networkx>=3.1
 graphviz>=0.20
 scipy>=1.11.0
